@@ -58,66 +58,303 @@ _startup = run_startup_checks()
 st.set_page_config(page_title="AI Cognitive Photonic Radar", layout="wide")
 
 # ===============================
-# CUSTOM CSS: COMMAND CENTER VIBE
+# CUSTOM CSS: PROFESSIONAL COMMAND CENTER
 # ===============================
 st.markdown("""
 <style>
-    /* Command Center Theme */
+    /* Root Colors */
+    :root {
+        --primary-cyan: #00f0ff;
+        --primary-blue: #0066ff;
+        --dark-bg: #05070a;
+        --card-bg: rgba(16, 33, 65, 0.5);
+        --border-color: #00f0ff;
+        --text-primary: #00f0ff;
+        --text-secondary: #a0b4ff;
+        --accent-green: #00ff88;
+        --danger-red: #ff4444;
+    }
+
+    /* Main Container */
     .main {
-        background-color: #05070a;
+        background: linear-gradient(135deg, #05070a 0%, #0a1428 50%, #05070a 100%);
         color: #00f0ff;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: 'Segoe UI', 'Roboto', Tahoma, Geneva, Verdana, sans-serif;
     }
+    
     .stApp {
-        background: radial-gradient(circle at top right, #0a192f, #05070a);
+        background: linear-gradient(135deg, #05070a 0%, #0a1428 50%, #05070a 100%);
     }
-    h1, h2, h3, h4, h5, h6 {
+
+    /* Typography */
+    h1 {
+        color: #00f0ff !important;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        text-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+        font-size: 2.5rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    h2 {
         color: #00f0ff !important;
         text-transform: uppercase;
         letter-spacing: 3px;
-        text-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+        text-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+        font-size: 1.8rem !important;
+        font-weight: 600 !important;
     }
-    .stMetric {
-        background: rgba(16, 33, 65, 0.4);
-        border: 1px solid #00f0ff;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.2);
+    
+    h3, h4 {
+        color: #a0b4ff !important;
+        letter-spacing: 2px;
+        font-weight: 600 !important;
     }
+
+    /* Sidebar */
     .stSidebar {
-        background-color: rgba(10, 25, 47, 0.9) !important;
-        border-right: 1px solid #00f0ff;
+        background: linear-gradient(180deg, rgba(10, 25, 47, 0.95) 0%, rgba(15, 30, 55, 0.95) 100%) !important;
+        border-right: 2px solid #00f0ff;
+        box-shadow: inset -5px 0 15px rgba(0, 240, 255, 0.1);
     }
+    
+    .stSidebar [data-testid="stSidebarUserContent"] {
+        padding-top: 2rem;
+    }
+
+    /* Metric Cards */
+    .stMetric {
+        background: linear-gradient(135deg, rgba(16, 33, 65, 0.6) 0%, rgba(20, 40, 75, 0.4) 100%);
+        border: 1.5px solid #00f0ff;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.2), inset 0 0 15px rgba(0, 240, 255, 0.05);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .stMetric:hover {
+        box-shadow: 0 0 30px rgba(0, 240, 255, 0.4), inset 0 0 20px rgba(0, 240, 255, 0.1);
+        transform: translateY(-2px);
+    }
+
+    /* Buttons */
     .stButton>button {
-        background: linear-gradient(135deg, #004e92, #000428);
-        color: #00f0ff;
-        border: 1px solid #00f0ff;
-        border-radius: 20px;
-        padding: 0.5rem 2rem;
-        transition: all 0.4s ease;
+        background: linear-gradient(135deg, #004e92 0%, #001f3f 100%);
+        color: #00f0ff !important;
+        border: 1.5px solid #00f0ff;
+        border-radius: 25px;
+        padding: 0.75rem 2.5rem !important;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         text-transform: uppercase;
         font-weight: bold;
+        letter-spacing: 1px;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
     }
+    
     .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 0 20px #00f0ff;
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 0 30px rgba(0, 240, 255, 0.6);
         border-color: #fff;
+        background: linear-gradient(135deg, #0066ff 0%, #004e92 100%);
     }
+    
+    .stButton>button:active {
+        transform: translateY(-1px) scale(0.98);
+    }
+
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
+        gap: 15px;
+        border-bottom: 2px solid rgba(0, 240, 255, 0.2);
+        background: rgba(10, 20, 40, 0.3);
+        padding: 10px 20px;
+        border-radius: 12px 12px 0 0;
     }
+    
     .stTabs [data-baseweb="tab"] {
-        background-color: rgba(16, 33, 65, 0.4);
-        border: 1px solid #333;
-        padding: 5px 15px;
-        border-radius: 5px 5px 0 0;
+        background-color: transparent;
+        border: 1px solid rgba(0, 240, 255, 0.3);
+        padding: 12px 24px;
+        border-radius: 8px;
+        color: #a0b4ff;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(0, 240, 255, 0.1);
+        border-color: #00f0ff;
         color: #00f0ff;
     }
+    
     .stTabs [aria-selected="true"] {
-        background-color: rgba(0, 240, 255, 0.2) !important;
-        border: 1px solid #00f0ff !important;
+        background: linear-gradient(135deg, rgba(0, 240, 255, 0.3) 0%, rgba(0, 102, 255, 0.2) 100%) !important;
+        border: 1.5px solid #00f0ff !important;
         color: #fff !important;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
     }
+
+    /* Input Fields */
+    .stTextInput>div>div>input,
+    .stNumberInput>div>div>input,
+    .stSelectbox>div>div>select {
+        background-color: rgba(20, 30, 60, 0.6) !important;
+        border: 1px solid rgba(0, 240, 255, 0.3) !important;
+        color: #00f0ff !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+        font-family: 'Courier New', monospace !important;
+    }
+    
+    .stTextInput>div>div>input:focus,
+    .stNumberInput>div>div>input:focus,
+    .stSelectbox>div>div>select:focus {
+        border-color: #00f0ff !important;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.4) !important;
+    }
+
+    /* Checkboxes and Radio */
+    .stCheckbox>label>div {
+        background-color: rgba(20, 30, 60, 0.5) !important;
+        border: 1px solid #00f0ff !important;
+        border-radius: 4px !important;
+    }
+    
+    .stRadio>label>div {
+        border: 1px solid #00f0ff !important;
+        border-radius: 50% !important;
+    }
+
+    /* Columns */
+    .stColumn {
+        padding: 20px;
+        background: linear-gradient(135deg, rgba(10, 25, 47, 0.3) 0%, rgba(15, 35, 65, 0.2) 100%);
+        border-radius: 12px;
+        border: 1px solid rgba(0, 240, 255, 0.15);
+        transition: all 0.3s ease;
+    }
+    
+    .stColumn:hover {
+        border-color: rgba(0, 240, 255, 0.3);
+        background: linear-gradient(135deg, rgba(10, 25, 47, 0.5) 0%, rgba(15, 35, 65, 0.3) 100%);
+    }
+
+    /* Expandable Containers */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, rgba(0, 102, 255, 0.2) 0%, rgba(0, 50, 150, 0.1) 100%);
+        border: 1px solid rgba(0, 240, 255, 0.2);
+        border-radius: 8px;
+        padding: 12px 16px !important;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        border-color: #00f0ff;
+        background: linear-gradient(135deg, rgba(0, 102, 255, 0.3) 0%, rgba(0, 50, 150, 0.2) 100%);
+    }
+
+    /* Metric Values */
+    [data-testid="metric"] .metric-value {
+        color: #00ff88 !important;
+        font-size: 1.8rem !important;
+        font-weight: 700 !important;
+    }
+    
+    [data-testid="metric"] .metric-label {
+        color: #a0b4ff !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Status Indicators */
+    .status-active {
+        color: #00ff88 !important;
+        text-shadow: 0 0 10px #00ff88;
+        font-weight: bold;
+    }
+    
+    .status-warning {
+        color: #ffaa00 !important;
+        text-shadow: 0 0 10px #ffaa00;
+        font-weight: bold;
+    }
+    
+    .status-error {
+        color: #ff4444 !important;
+        text-shadow: 0 0 10px #ff4444;
+        font-weight: bold;
+    }
+
+    /* Info/Alert Boxes */
+    .stInfo, .stSuccess, .stWarning, .stError {
+        border-radius: 12px !important;
+        padding: 20px !important;
+        border-left: 4px solid !important;
+    }
+    
+    .stInfo {
+        background: rgba(0, 102, 255, 0.15) !important;
+        border-left-color: #0066ff !important;
+    }
+    
+    .stSuccess {
+        background: rgba(0, 255, 136, 0.15) !important;
+        border-left-color: #00ff88 !important;
+    }
+    
+    .stWarning {
+        background: rgba(255, 170, 0, 0.15) !important;
+        border-left-color: #ffaa00 !important;
+    }
+    
+    .stError {
+        background: rgba(255, 68, 68, 0.15) !important;
+        border-left-color: #ff4444 !important;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(10, 20, 40, 0.5);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #00f0ff, #0066ff);
+        border-radius: 6px;
+        border: 2px solid rgba(10, 20, 40, 0.5);
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #33ffff, #0088ff);
+    }
+
+    /* Animation */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    @keyframes glow {
+        0%, 100% { text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+        50% { text-shadow: 0 0 20px rgba(0, 240, 255, 1); }
+    }
+    
+    .pulse {
+        animation: pulse 2s infinite;
+    }
+    
+    .glow {
+        animation: glow 2s infinite;
+    }
+</style>
+""", unsafe_allow_html=True)
     /* Radar-like scanning animation for aesthetic */
     @keyframes scan {
         0% { border-top: 1px solid #00f0ff; }
