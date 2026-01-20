@@ -1,0 +1,22 @@
+# Primary Dependencies
+numpy
+scipy
+matplotlib
+streamlit
+torch
+torchvision
+torchaudio
+opencv-python
+pyrtlsdr
+kafka-python
+psutil
+seaborn
+scikit-learn
+plotly
+
+# Configuration & logging helpers
+pyyaml
+python-json-logger
+
+# Optional / Legacy
+# tensorflow (Not supported on Python 3.14 yet)

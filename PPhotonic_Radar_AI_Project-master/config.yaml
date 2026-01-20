@@ -1,0 +1,156 @@
+# Centralized configuration for PPhotonic Radar AI
+logging:
+  level: INFO
+  dir: results
+  file: system.log
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+model:
+  path: results/radar_model_pytorch.pt
+  checksum: ""  # sha256 hex string to validate model; leave empty to skip
+  allow_unverified: true
+
+dataset:
+  required_paths:
+    - data/train
+    - data/val
+
+environment:
+  min_python: "3.8"
+  supported_platforms:
+    - Linux
+    - Windows
+
+photonic_model:
+  laser_linewidth_hz: 1e4            # laser linewidth (Hz) - higher value -> more phase noise
+  optical_freq_hz: 193.414e12        # optical carrier (Hz)
+  local_osc_freq_offset_hz: 1e9      # beat frequency between signal and LO (Hz)
+  num_channels: 4
+  beamjitter_std_ns: 0.5             # per-channel jitter std (ns)
+  fractional_delay_method: fft       # 'fft' (recommended) or 'sinc' (more costly)
+  enabled: true                      # enable photonic model as default replacement
+  temp_drift_rate_C_per_s: 0.005     # temperature drift rate (deg C / s)
+  temp_coherence_scale_C: 2.0        # coherence decay scale (deg C)
+  amplitude: 1.0
+  seed: null                         # default RNG seed (null = use provided call-time seed)
+  fractional_delay_max_ns: 5.0       # clamp delays to this range for stability (ns)
+
+detection:
+  enabled: true
+  method: ca
+  guard: 2
+  train: 8
+  pfa: 1e-6
+  crop_size: 32
+tracker:
+  enabled: true
+  max_missed: 5                    # max missed detections before track deletion
+  confirmation_threshold: 3        # detections required to confirm track
+  gating_threshold: 20.0           # max Euclidean distance for association (pixels)
+  process_noise: 0.1               # Kalman filter process noise std
+  measurement_noise: 1.0           # Kalman filter measurement noise std
+  max_tracks: 100                  # maximum simultaneous tracks allowed
+
+cognitive_controller:
+  enabled: true                    # enable cognitive adaptation
+  learning_rate: 0.1               # Q-learning alpha (step size)
+  discount_factor: 0.9             # Q-learning gamma (future value weight)
+  epsilon: 0.15                    # exploration rate (0=pure exploit, 1=pure explore)
+  epsilon_decay: 0.995             # decay rate per 100 steps
+  min_epsilon: 0.01                # minimum exploration rate
+  max_memory: 1000                 # max experience replay buffer size
+  reward:
+    weight_detection: 0.4          # reward for detection confidence
+    weight_tracking: 0.3           # reward for tracking confidence
+    weight_false_alarm: -0.5       # penalize false alarm rate
+    weight_energy: -0.2            # penalize energy usage
+    weight_tracks: 0.1             # reward for active tracks
+  policy_save_path: results/cognitive_policy.json
+ew_defense:
+  enabled: true                    # enable electronic warfare defense
+  noise_history_size: 50           # number of frames to track for SNR analysis
+  snr_threshold_db: -5.0           # SNR degradation threshold for jamming detection
+  max_detections: 50               # expected max detections per frame
+  ml_threshold: 0.7                # AI confidence threshold for false target discrimination
+  base_freq_hz: 10e9               # base carrier frequency (10 GHz)
+  hop_set_size: 10                 # number of frequencies for hopping
+  jam_detection_consecutive: 3     # frames of low SNR to trigger jamming alert
+
+ai_hardening:
+  enabled: true                    # enable AI reliability hardening
+  confidence_threshold: 0.7        # min softmax confidence for reliable predictions
+  entropy_threshold: 1.0           # max Shannon entropy for reliable predictions
+  ood_threshold: 0.5               # OOD score threshold (0-1)
+  ood_method: entropy              # OOD detection method: 'entropy', 'reconstruction', 'activation'
+  disagreement_threshold: 0.3      # model disagreement CV threshold
+  return_saliency: false           # generate Grad-CAM saliency maps (slower)
+  saliency_target_layer: features  # target layer for Grad-CAM visualization
+
+security:
+  enabled: true                    # enable security hardening
+  
+  # RBAC (Role-Based Access Control)
+  rbac_enabled: true
+  default_role: analyst            # default role for new users
+  require_mfa: false               # require multi-factor authentication
+  session_timeout_minutes: 60      # session expiration time
+  max_login_attempts: 3            # failed login attempts before lockout
+  
+  # Model & File Integrity
+  verify_model_checksum: true      # verify model file integrity on load
+  verify_config_checksum: false    # verify configuration file integrity
+  checksum_algorithm: sha256       # checksum method: 'sha256', 'md5'
+  
+  # Tamper Detection
+  tamper_detection_enabled: true
+  monitor_critical_files: true     # continuous monitoring of critical files
+  monitor_interval_seconds: 60     # how often to check file integrity
+  tamper_detection_level: critical # alert level: 'low', 'medium', 'high', 'critical'
+  
+  # Deployment Architecture
+  deployment_mode: standalone      # deployment mode: 'standalone', 'edge-command', 'distributed'
+  
+  # Edge-Node Configuration (when deployment_mode = edge-command)
+  edge_nodes:
+    - node_id: edge1
+      hostname: 127.0.0.1
+      port: 5000
+      type: edge
+      secure: false
+  
+  # Command-Node Configuration (when deployment_mode = edge-command)
+  command_nodes:
+    - node_id: command1
+      hostname: 127.0.0.1
+      port: 6000
+      type: command
+      secure: false
+  
+  # TLS/SSL Configuration
+  tls_enabled: false               # enable TLS for inter-node communication
+  tls_cert_path: ""                # path to TLS certificate
+  tls_key_path: ""                 # path to TLS private key
+  tls_verify: true                 # verify peer certificate
+  
+  # Audit & Logging
+  audit_log_enabled: true          # enable security audit logging
+  audit_log_file: results/audit.log
+  log_all_permission_checks: false # verbose logging of permission checks
+  export_audit_on_shutdown: true   # export audit log when system stops
+  
+  # Cryptographic Secrets (NEVER commit to version control!)
+  shared_secret_file: ""           # file containing shared secret for HMAC
+  encryption_key_file: ""          # file containing encryption key for sensitive data
+  
+  # Fail-Safe Behavior
+  fail_safe_mode: true             # default-deny security posture
+  shutdown_on_tamper: true         # shutdown system if tampering detected
+  require_operator_confirmation: false  # require operator approval for critical operations
+  
+  # Threat Levels
+  threat_levels:
+    green: 0                        # normal operations
+    yellow: 1                       # elevated awareness
+    red: 2                          # critical/active threat
+    black: 3                        # system shutdown/lockdown

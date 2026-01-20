@@ -1,0 +1,373 @@
+"""
+MILITARY RADAR CONSOLE - QUICK START GUIDE
+
+Four Operational Modes for Military Radar Command & Control
+"""
+
+# ==============================================================================
+# QUICK START
+# ==============================================================================
+
+1. LAUNCH THE CONSOLE
+   $ cd /path/to/PPhotonic_Radar_AI_Project-master
+   $ source .venv/bin/activate
+   $ streamlit run app_console.py
+
+2. SELECT OPERATIONAL MODE
+   → Sidebar: Choose from [OPERATOR | COMMANDER | RESEARCH | MAINTENANCE]
+
+3. IDENTIFY OPERATOR
+   → Sidebar: Enter operator name for audit trail
+
+4. SELECT SECTOR
+   → Sidebar: Choose coverage area [Full | North | South | East | West | Custom]
+
+5. SET MISSION STATUS
+   → Sidebar: Select [Active | Standby | Maintenance | Training]
+
+# ==============================================================================
+# MODE SELECTION GUIDE
+# ==============================================================================
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ MODE SELECTION FLOWCHART                                                │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Are you...                                                             │
+│  │                                                                      │
+│  ├─ Actively monitoring radar RIGHT NOW?                              │
+│  │  → Use OPERATOR MODE (real-time alerts, fast UI)                   │
+│  │                                                                      │
+│  ├─ Reviewing situation for tactical decision?                         │
+│  │  → Use COMMANDER MODE (strategic overview, statistics)              │
+│  │                                                                      │
+│  ├─ Analyzing performance or debugging system?                          │
+│  │  → Use RESEARCH MODE (detailed metrics, replay, trends)             │
+│  │                                                                      │
+│  ├─ Checking system health or tuning parameters?                        │
+│  │  → Use MAINTENANCE MODE (diagnostics, configuration)                │
+│  │                                                                      │
+│  └─ Not sure?                                                          │
+│     → Start with OPERATOR MODE (most responsive)                       │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+# ==============================================================================
+# MODE COMPARISON
+# ==============================================================================
+
+OPERATOR MODE
+────────────────────────────────────────────────────────────────────────────
+Purpose:     Real-time tactical operations
+Users:       Radar operators, tactical controllers
+Response:    Immediate (alerts pop up automatically)
+Focus:       Active threats and tracks
+Tabs:        🎯 THREATS | ⚠️ ALERTS | 📡 DETECTIONS | 📍 TRACKING
+Key Action:  Dismiss critical alerts quickly
+
+COMMANDER MODE
+────────────────────────────────────────────────────────────────────────────
+Purpose:     Strategic situation awareness
+Users:       Officers, mission commanders
+Response:    Summary and trends (5-10 minute timescale)
+Focus:       Overall mission status and statistics
+Tabs:        🎯 SITUATION | 📈 ANALYSIS | 🔔 INCIDENT LOG
+Key Action:  Review strategic SITREP and incident trends
+
+RESEARCH MODE
+────────────────────────────────────────────────────────────────────────────
+Purpose:     Technical analysis and debugging
+Users:       Engineers, researchers, analysts
+Response:    Detailed metrics with drill-down capability
+Focus:       Performance data and system behavior
+Tabs:        📊 METRICS | 🔍 REPLAY | ⚙️ DEBUG | 📈 TRENDS
+Key Action:  Replay session and analyze root causes
+
+MAINTENANCE MODE
+────────────────────────────────────────────────────────────────────────────
+Purpose:     System health and configuration
+Users:       System administrators, technicians
+Response:    Diagnostic information and configuration UI
+Focus:       Component health and parameter tuning
+Tabs:        🏥 HEALTH | ⚙️ CONFIG | 🔐 LOGS
+Key Action:  Adjust parameters and monitor diagnostics
+
+# ==============================================================================
+# ALERT SEVERITY LEVELS
+# ==============================================================================
+
+🟢 INFO
+   └─ System updates, mode changes, normal operations
+   └─ Action: Read and dismiss (no urgency)
+
+🟡 WARNING
+   └─ Performance degradation, high false alarm rate, signal concerns
+   └─ Action: Review and monitor (investigate if trend continues)
+
+🔴 CRITICAL
+   └─ Signal loss, jamming detected, track anomalies
+   └─ Action: Immediate investigation required
+
+🔴⚠️ SYSTEM FAILURE
+   └─ Component failures, database sync issues
+   └─ Action: Contact support immediately
+
+# ==============================================================================
+# INCIDENT TYPES
+# ==============================================================================
+
+DETECTION    → Target radar contact
+TRACKING     → Track created, updated, or confirmed
+OOD_EVENT    → Out-of-distribution anomaly detected
+JAMMING      → Electronic warfare jamming detected
+FALSE_ALARM  → Confirmed false target
+SYSTEM_ERROR → System malfunction or error
+ANOMALY      → Unusual sensor behavior
+
+# ==============================================================================
+# COMMON TASKS
+# ==============================================================================
+
+TASK 1: View Active Threats
+─────────────────────────────────────────────────────────────────────────────
+1. Switch to OPERATOR MODE
+2. Click tab: 🎯 THREATS
+3. See: Threat count, active tracks, confidence average
+4. Review: Bearing, range, and confidence for each threat
+→ Result: Current tactical picture (updates every scan)
+
+TASK 2: Respond to Critical Alert
+─────────────────────────────────────────────────────────────────────────────
+1. See red alert box on any screen
+2. Click tab: ⚠️ ALERTS (if in Operator Mode)
+3. Read: Alert title and message
+4. Click: "Dismiss Alert" button
+5. Optionally switch to COMMANDER MODE for strategic context
+→ Result: Alert logged and removed from active view
+
+TASK 3: Analyze False Alarms
+─────────────────────────────────────────────────────────────────────────────
+1. Switch to COMMANDER MODE
+2. Click tab: 📈 ANALYSIS
+3. View: Incident distribution chart
+4. Look for: "False Alarm" spike
+5. Switch to RESEARCH MODE for detailed analysis
+6. Click tab: 🔍 REPLAY
+7. Use slider to navigate to false alarm timeframe
+→ Result: Root cause identification
+
+TASK 4: Monitor System Health
+─────────────────────────────────────────────────────────────────────────────
+1. Switch to MAINTENANCE MODE
+2. Click tab: 🏥 HEALTH
+3. Review: Status of all components
+4. Check: Green checkmarks (✓) for all systems
+5. If red (✗): Contact support with error details
+→ Result: System health validation
+
+TASK 5: Export Incident Data
+─────────────────────────────────────────────────────────────────────────────
+1. Switch to COMMANDER MODE (or RESEARCH MODE)
+2. Click tab: 🔔 INCIDENT LOG (or 📊 METRICS)
+3. Data automatically displayed in table
+4. Use browser: Right-click → "Save as..." to export CSV
+5. Or: Run export function in Python
+   ```python
+   console.incident_logger.export_incidents("report.json")
+   ```
+→ Result: Incident data saved for analysis/reporting
+
+TASK 6: Replay Session
+─────────────────────────────────────────────────────────────────────────────
+1. Switch to RESEARCH MODE
+2. Click tab: 🔍 REPLAY
+3. Use controls:
+   - ⏮️ Beginning: Go to frame 0
+   - ⏯️ Play: Start playback
+   - ⏸️ Pause: Stop playback
+4. Slider: Seek to specific frame
+5. Frame counter: Shows "Frame X of Y"
+→ Result: Replay session with event markers
+
+TASK 7: Adjust Radar Parameters
+─────────────────────────────────────────────────────────────────────────────
+1. Switch to MAINTENANCE MODE
+2. Click tab: ⚙️ CONFIG
+3. Adjust sliders:
+   - Carrier Frequency: 1-40 GHz
+   - Bandwidth: 10-500 MHz
+   - Pulse Repetition Freq: 1-100 kHz
+   - Pulse Width: 0.1-10 µs
+4. Click: "💾 Save Configuration"
+5. Verify: "Configuration saved successfully" message
+→ Result: Parameters updated and persisted
+
+# ==============================================================================
+# KEYBOARD SHORTCUTS (In Streamlit UI)
+# ==============================================================================
+
+⌘/Ctrl+Shift+R  - Refresh UI (Ctrl+Shift+R on Windows/Linux)
+⌘/Ctrl+/        - Toggle sidebar
+↑ Arrow / ↓ Arrow - Scroll alert list
+Tab / Shift+Tab  - Navigate between mode tabs
+
+# ==============================================================================
+# EXAMPLE SCENARIOS
+# ==============================================================================
+
+SCENARIO 1: Morning Operations Briefing
+────────────────────────────────────────────────────────────────────────────
+Time: 0600 hours
+Action:
+  1. Commander logs in → enters name → selects COMMANDER MODE
+  2. Sector: "Full Coverage"
+  3. Mission Status: "Active"
+  4. Reviews overnight incidents via INCIDENT LOG tab
+  5. Checks 📈 ANALYSIS for false alarm trends
+  6. Briefs operators on overnight events
+Result: Situational awareness update
+
+SCENARIO 2: Tactical Detection
+────────────────────────────────────────────────────────────────────────────
+Time: 1200 hours - Unexpected contact
+Action:
+  1. Operator sees ⚠️ WARNING alert (high false alarm rate)
+  2. Switches focus to 📡 DETECTIONS tab in OPERATOR MODE
+  3. Reviews 5 most recent detections
+  4. Notices pattern of detections at same range (clutter?)
+  5. Calls senior controller
+  6. Controller logs in with COMMANDER MODE
+  7. Reviews 📈 ANALYSIS for spatial pattern
+  8. Determines: Weather-induced false alarm pattern
+  9. Adjusts CFAR threshold via MAINTENANCE MODE CONFIG
+Result: System reconfigured, false alarm rate reduced
+
+SCENARIO 3: Post-Mission Analysis
+────────────────────────────────────────────────────────────────────────────
+Time: 1800 hours - 8-hour mission complete
+Action:
+  1. Engineer logs in → RESEARCH MODE
+  2. Reviews 📊 METRICS tab:
+     - 127 detections logged
+     - 12 false alarms (9.4% FAR)
+     - 1 OOD event (anomalous signal)
+  3. Switches to 🔍 REPLAY tab
+  4. Seeks to OOD event timeframe
+  5. Step through frames around OOD incident
+  6. Exports incident data: "mission_20260120.json"
+Result: Performance report generated
+
+SCENARIO 4: System Maintenance
+────────────────────────────────────────────────────────────────────────────
+Time: 0300 hours - Scheduled maintenance
+Action:
+  1. Admin logs in → MAINTENANCE MODE
+  2. Reviews 🏥 HEALTH:
+     - Storage: 65% used (warning)
+     - Database: 485 incidents stored
+  3. Switches to 🔐 LOGS tab
+  4. Sees normal operation over past 24 hours
+  5. Plans: Archive incidents older than 30 days
+  6. Executes cleanup routine
+Result: System optimized, ready for next operational period
+
+# ==============================================================================
+# TESTING & DEMO
+# ==============================================================================
+
+At bottom of each screen:
+
+Button 1: "Add Test Alert (Warning)"
+          → Creates sample warning alert for testing UI
+
+Button 2: "Add Test Alert (Critical)"
+          → Creates sample critical alert
+
+Button 3: "Log Test Incident"
+          → Creates sample incident entry
+
+Button 4: "Clear All Alerts"
+          → Removes all active alerts (for cleanup)
+
+Use these buttons to:
+  ✓ Test alert display logic
+  ✓ Verify incident logging
+  ✓ Practice alert dismissal
+  ✓ Demo system to stakeholders
+
+# ==============================================================================
+# TROUBLESHOOTING
+# ==============================================================================
+
+Problem: "ModuleNotFoundError: No module named 'streamlit'"
+Solution: pip install streamlit
+
+Problem: "Alerts not showing up"
+Solution: Check console_state is initialized in sidebar, use test buttons
+
+Problem: "Replay frames not appearing"
+Solution: Run test scenario to generate frames, then try replay
+
+Problem: "Database locked error"
+Solution: Restart Streamlit app (ctrl+c, then streamlit run app_console.py)
+
+Problem: "Config changes not persisting"
+Solution: Ensure "Save Configuration" button clicked, check results/ directory
+
+# ==============================================================================
+# STATISTICS & METRICS
+# ==============================================================================
+
+All modes display these metrics:
+
+Detections Count    - Total radar contacts in current session
+Active Tracks       - Confirmed tracks being maintained
+False Alarms        - Misidentified targets
+OOD Events          - Out-of-distribution anomalies
+System Uptime       - HH:MM:SS format
+Active Alerts       - Currently visible alerts
+Critical Alerts     - Only critical/failure level
+
+Access via:
+  console.get_dashboard_stats()  (Python API)
+  → Returns dict with all metrics
+
+# ==============================================================================
+# BEST PRACTICES
+# ==============================================================================
+
+✓ DO:
+  ✓ Review alert source (which component generated it)
+  ✓ Maintain operator name for audit trail
+  ✓ Use COMMANDER MODE for strategic decisions
+  ✓ Export incidents at end of shift
+  ✓ Regular health checks in MAINTENANCE MODE
+  ✓ Test UI functionality at shift start
+
+✗ DON'T:
+  ✗ Ignore CRITICAL alerts
+  ✗ Clear all alerts without reviewing
+  ✗ Forget to save configuration changes
+  ✗ Run RESEARCH MODE during active operations (use OPERATOR MODE)
+  ✗ Modify system config without proper authorization
+  ✗ Rely on replay for real-time decisions (use OPERATOR MODE)
+
+# ==============================================================================
+# SUPPORT & DOCUMENTATION
+# ==============================================================================
+
+Full Documentation:  CONSOLE_MODES.md
+API Reference:       src/console_modes.py
+UI Implementation:   app_console.py
+Test Suite:          tests/test_console_modes.py (27 tests)
+
+Questions? Check the documentation files or run test suite:
+  pytest tests/test_console_modes.py -v
+
+Version: 1.0
+Last Updated: 2026-01-20
+Status: Production Ready ✓
+"""
+
+if __name__ == "__main__":
+    print(__doc__)

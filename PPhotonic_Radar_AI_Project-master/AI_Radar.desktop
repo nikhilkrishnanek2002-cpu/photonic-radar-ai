@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AI Cognitive Radar
+Comment=AI-Powered Radar Signal Analysis System
+Exec=/usr/bin/python3 /home/nikhil/PycharmProjects/PPhotonic_Radar_AI_Project/launcher.py
+Icon=radar
+Terminal=true
+Categories=Science;Education;
+StartupNotify=true
