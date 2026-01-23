@@ -1,4 +1,4 @@
-# Multi-Input Cognitive Photonic Radar AI System
+# PHOENIX-RADAR: Cognitive Photonic Radar with AI
 
 Professional defence-research-grade AI-enabled cognitive photonic radar simulation.
 

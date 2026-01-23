@@ -23,8 +23,20 @@ except ImportError:
 from src.config import get_config
 from src.logger import init_logging, log_event, read_logs
 from src.startup_checks import run_startup_checks
-from src.feature_extractor import get_all_features
-from src.detection import detect_targets_from_raw
+# Cache the feature extraction and detection
+@st.cache_data(show_spinner=False, ttl=10) # Cache for 10 seconds max
+def cached_get_all_features(signal, fs=4096, rd_map=None):
+    from src.feature_extractor import get_all_features
+    return get_all_features(signal, fs, rd_map)
+
+@st.cache_data(show_spinner=False, ttl=10)
+def cached_detect_targets(signal, fs=4096, n_range=128, n_doppler=128, method='ca', **kwargs):
+    from src.detection import detect_targets_from_raw
+    return detect_targets_from_raw(signal, fs, n_range, n_doppler, method, **kwargs)
+
+# Direct imports retained for typing but functions redirected
+from src.feature_extractor import get_all_features as _uncached_features
+from src.detection import detect_targets_from_raw as _uncached_detect
 from src.model_pytorch import build_pytorch_model
 from src.auth import authenticate
 from src.security_utils import safe_path
@@ -37,6 +49,8 @@ from src.db import init_db, ensure_admin_exists
 from src.stream_bus import get_producer
 from src.xai_pytorch import grad_cam_pytorch
 from src.cognitive_logic import adaptive_threshold
+from src.ai_hardening import ConfidenceEstimator, OutOfDistributionDetector
+from src.tamper_detection import TamperDetector, TamperSeverity
 
 # ===============================
 # ENVIRONMENT SAFETY
@@ -55,14 +69,30 @@ _startup = run_startup_checks()
 # ===============================
 # STREAMLIT CONFIG (FIRST CALL)
 # ===============================
-st.set_page_config(page_title="AI Cognitive Photonic Radar", layout="wide")
+st.set_page_config(page_title="PHOENIX-RADAR: Cognitive Photonic Radar with AI", layout="wide")
 
 # Simple UI mode: set True for a very minimal interface
-SIMPLE_UI = True
+# Simple UI mode: set True for a very minimal interface
+SIMPLE_UI = False
+
+# Initialize perf_mode in session state if not present (defaults to True)
+if "perf_mode" not in st.session_state:
+    st.session_state.perf_mode = False # Default to 3D
+
+# Global perf_mode variable (Correctly Initialized)
+perf_mode = st.session_state.perf_mode
+
 
 if SIMPLE_UI:
     st.title("Photonic Radar — Simple UI")
     st.write("Minimal interface for quick inspection and demo.")
+    
+    # PERFORMANCE MODE (Global for simple UI too)
+    # Sidebar control for perf_mode (will be rendered in sidebar but valid here)
+    perf_mode_check = st.sidebar.checkbox("🚀 High Performance Mode", value=st.session_state.perf_mode, help="Disables 3D plots and heavy effects for speed.", key="perf_mode_global")
+    st.session_state.perf_mode = perf_mode_check
+    perf_mode = perf_mode_check
+
     # Visualization controls
     colormap_rd = st.selectbox("RD colormap", ['Viridis', 'Cividis', 'Plasma', 'Magma', 'Jet'], index=0)
     colormap_sp = st.selectbox("Spectrogram colormap", ['Cividis', 'Viridis', 'Plasma', 'Magma', 'Jet'], index=0)
@@ -144,17 +174,25 @@ if SIMPLE_UI:
 # ===============================
 st.markdown("""
 <style>
-    /* Root Colors */
+    /* =========================================
+       CYBERPUNK ORBITAL COMMAND THEME
+       ========================================= */
+       
+    /* 1. Global Reset & Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+    
     :root {
-        --primary-cyan: #00f0ff;
-        --primary-blue: #0066ff;
-        --dark-bg: #05070a;
-        --card-bg: rgba(16, 33, 65, 0.5);
-        --border-color: #00f0ff;
-        --text-primary: #00f0ff;
-        --text-secondary: #a0b4ff;
-        --accent-green: #00ff88;
-        --danger-red: #ff4444;
+        --neon-cyan: #00f3ff;
+        --neon-purple: #bc13fe;
+        --neon-green: #0aff68;
+        --bg-deep: #020408;
+        --bg-panel: rgba(10, 15, 30, 0.75);
+        --grid-color: rgba(0, 243, 255, 0.1);
+        --glass-border: 1px solid rgba(0, 243, 255, 0.3);
+    }
+
+    html, body, [class*="css"] {
+        font-family: 'Rajdhani', sans-serif;
     }
 
     /* Main Container */
@@ -164,82 +202,89 @@ st.markdown("""
         font-family: 'Segoe UI', 'Roboto', Tahoma, Geneva, Verdana, sans-serif;
     }
     
+    /* 2. Main App Background & Grid Overlay */
     .stApp {
-        background: linear-gradient(135deg, #05070a 0%, #0a1428 50%, #05070a 100%);
+        background-color: var(--bg-deep);
+        background-image: 
+            linear-gradient(var(--grid-color) 1px, transparent 1px),
+            linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
+            radial-gradient(circle at 50% 50%, rgba(20, 30, 60, 0) 0%, #020408 100%);
+        background-size: 40px 40px, 40px 40px, 100% 100%;
+        background-attachment: fixed;
     }
 
-    /* Typography */
-    h1 {
-        color: #00f0ff !important;
+    /* 3. Typography & Headers */
+    h1, h2, h3 {
+        font-family: 'Orbitron', 'sans-serif';
         text-transform: uppercase;
-        letter-spacing: 4px;
-        text-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
-        font-size: 2.5rem !important;
-        font-weight: 700 !important;
+        letter-spacing: 2px;
+        color: var(--neon-cyan) !important;
+        text-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+    }
+    
+    h1 { font-size: 3.5rem !important; margin-bottom: 0.5rem !important; }
         margin-bottom: 1rem !important;
     }
     
-    h2 {
-        color: #00f0ff !important;
-        text-transform: uppercase;
-        letter-spacing: 3px;
-        text-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
-        font-size: 1.8rem !important;
-        font-weight: 600 !important;
+    h2 { font-size: 2rem !important; border-left: 5px solid var(--neon-purple); padding-left: 15px; }
+
+    p, span, div, label {
+        color: #e0e6ed;
+        letter-spacing: 0.5px;
     }
     
-    h3, h4 {
-        color: #a0b4ff !important;
-        letter-spacing: 2px;
-        font-weight: 600 !important;
+    /* Monospace for data */
+    .stCode, .stMetric, .metric-value {
+        font-family: 'Share Tech Mono', monospace !important;
     }
 
-    /* Sidebar */
-    .stSidebar {
-        background: linear-gradient(180deg, rgba(10, 25, 47, 0.95) 0%, rgba(15, 30, 55, 0.95) 100%) !important;
-        border-right: 2px solid #00f0ff;
-        box-shadow: inset -5px 0 15px rgba(0, 240, 255, 0.1);
+    /* 4. Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background-color: rgba(5, 10, 20, 0.95);
+        border-right: 2px solid var(--neon-cyan);
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
     }
     
     .stSidebar [data-testid="stSidebarUserContent"] {
         padding-top: 2rem;
     }
 
-    /* Metric Cards */
-    .stMetric {
-        background: linear-gradient(135deg, rgba(16, 33, 65, 0.6) 0%, rgba(20, 40, 75, 0.4) 100%);
-        border: 1.5px solid #00f0ff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 0 20px rgba(0, 240, 255, 0.2), inset 0 0 15px rgba(0, 240, 255, 0.05);
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
+    /* 5. Glassmorphism Panels */
+    .stMetric, .stInfo, .stSuccess, .stWarning, .stError, div[data-testid="stExpander"] {
+        background: var(--bg-panel);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: var(--glass-border);
+        border-radius: 4px; /* Angled corners aesthetic */
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
     }
     
     .stMetric:hover {
-        box-shadow: 0 0 30px rgba(0, 240, 255, 0.4), inset 0 0 20px rgba(0, 240, 255, 0.1);
         transform: translateY(-2px);
+        box-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+        border-color: var(--neon-cyan);
     }
 
-    /* Buttons */
-    .stButton>button {
-        background: linear-gradient(135deg, #004e92 0%, #001f3f 100%);
-        color: #00f0ff !important;
-        border: 1.5px solid #00f0ff;
-        border-radius: 25px;
-        padding: 0.75rem 2.5rem !important;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    /* 6. Neon Buttons */
+    .stButton > button {
+        background: transparent;
+        color: var(--neon-cyan);
+        border: 2px solid var(--neon-cyan);
+        border-radius: 2px;
+        font-family: 'Orbitron', sans-serif;
         text-transform: uppercase;
-        font-weight: bold;
-        letter-spacing: 1px;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+        font-weight: 700;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
     }
     
-    .stButton>button:hover {
-        transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 0 30px rgba(0, 240, 255, 0.6);
-        border-color: #fff;
-        background: linear-gradient(135deg, #0066ff 0%, #004e92 100%);
+    .stButton > button:hover {
+        background: var(--neon-cyan);
+        color: #000;
+        box-shadow: 0 0 30px var(--neon-cyan);
+        transform: scale(1.02);
     }
     
     .stButton>button:active {
@@ -280,23 +325,19 @@ st.markdown("""
         box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
     }
 
-    /* Input Fields */
-    .stTextInput>div>div>input,
-    .stNumberInput>div>div>input,
-    .stSelectbox>div>div>select {
-        background-color: rgba(20, 30, 60, 0.6) !important;
-        border: 1px solid rgba(0, 240, 255, 0.3) !important;
-        color: #00f0ff !important;
-        border-radius: 8px !important;
-        padding: 12px !important;
-        font-family: 'Courier New', monospace !important;
+    /* 7. Input Fields */
+    input, select, textarea {
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        border: 1px solid #334e68 !important;
+        color: var(--neon-cyan) !important;
+        font-family: 'Share Tech Mono', monospace !important;
     }
     
-    .stTextInput>div>div>input:focus,
-    .stNumberInput>div>div>input:focus,
-    .stSelectbox>div>div>select:focus {
-        border-color: #00f0ff !important;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.4) !important;
+    input:focus {
+        border-color: var(--neon-cyan) !important;
+        box-shadow: 0 0 10px rgba(0, 243, 255, 0.3) !important;
+    }
+
     }
 
     /* Checkboxes and Radio */
@@ -417,26 +458,32 @@ st.markdown("""
         background: linear-gradient(180deg, #33ffff, #0088ff);
     }
 
-    /* Animation */
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-    }
-    
-    @keyframes glow {
-        0%, 100% { text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
-        50% { text-shadow: 0 0 20px rgba(0, 240, 255, 1); }
-    }
-    
-    .pulse {
-        animation: pulse 2s infinite;
-    }
-    
-    .glow {
-        animation: glow 2s infinite;
-    }
 </style>
 """, unsafe_allow_html=True)
+
+# Conditional CSS for heavy animations
+if not perf_mode:
+    st.markdown("""
+    <style>
+    /* 8. Threat Monitor Animation */
+    @keyframes scanline {
+        0% { transform: translateY(-100%); }
+        100% { transform: translateY(100vh); }
+    }
+    
+    .scan-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: linear-gradient(to bottom, transparent, rgba(0, 243, 255, 0.1), transparent);
+        pointer-events: none;
+        animation: scanline 4s linear infinite;
+        z-index: 9999;
+        opacity: 0.3;
+    }
+    </style>
+    <!-- Scanning Line Overlay -->
+    <div class="scan-overlay"></div>
+    """, unsafe_allow_html=True)
 
 st.markdown("""
 <style>
@@ -522,6 +569,25 @@ if "track_history" not in st.session_state:
 if "sensitivity_offset" not in st.session_state:
     st.session_state.sensitivity_offset = 0.0
 
+if "tamper_detector" not in st.session_state:
+    td = TamperDetector()
+    # Add files to monitor
+    # td.add_critical_file("app.py") # Disabled during dev to prevent self-triggering
+    try:
+        td.add_critical_file("src/model_pytorch.py")
+        td.add_critical_file("src/ew_defense.py")
+    except:
+        pass
+    td.establish_baseline_batch(["app.py"])
+    st.session_state.tamper_detector = td
+    st.session_state.tamper_check_timer = time.time()
+
+if "ai_hardening" not in st.session_state:
+    st.session_state.ai_hardening = {
+        'conf_estimator': ConfidenceEstimator(),
+        'ood_detector': OutOfDistributionDetector(method='entropy', threshold=0.6)
+    }
+
 
 # ===============================
 # LOAD PYTORCH MODEL
@@ -549,6 +615,10 @@ def load_model():
 
 radar_model, device = load_model()
 
+if 'real_loader' not in st.session_state:
+    from src.data_loader_real import RealDataLoader
+    st.session_state.real_loader = RealDataLoader()
+
 # ===============================
 # AUTHENTICATION CONTROL FLOW
 # ===============================
@@ -560,10 +630,21 @@ if not st.session_state.logged_in:
         with st.form("login"):
             username = st.text_input("Operator ID")
             password = st.text_input("Access Code", type="password")
+            
+            # 2D/3D Mode Selection at Logic
+            viz_mode = st.radio("Visualization Mode", ["3D Immersive (High Fidelity)", "2D Performance (Fast)"], index=0)
+
             if st.form_submit_button("AUTHORIZE"):
                 ok, role = authenticate(username, password)
                 if ok:
                     st.session_state.logged_in = True
+                    
+                    # Set performance mode based on selection
+                    if "2D" in viz_mode:
+                        st.session_state.perf_mode = True
+                    else:
+                        st.session_state.perf_mode = False
+
                     st.session_state.user = username
                     st.session_state.role = role
                     st.success("✅ AUTHORIZED. ACCESS GRANTED.")
@@ -622,13 +703,21 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 animate = st.sidebar.checkbox("Enable Animation", True)
+
+# PERFORMANCE MODE (Moved to top of file for global scope access)
+perf_mode = st.session_state.get("perf_mode", False)
+
+
 gain = st.sidebar.slider("Gain (dB)", 1, 40, 15)
 distance = st.sidebar.slider("Distance (m)", 10, 1000, 200)
-source = st.sidebar.radio("Signal Source", ["Simulated", "RTL-SDR"])
+source = st.sidebar.radio("Signal Source", ["Simulated", "RTL-SDR", "Real Data (77GHz)"])
 
 if source == "RTL-SDR":
     st.sidebar.warning("🎯 Target Type is ignored in RTL-SDR mode (using live data)")
     target = st.sidebar.selectbox("Target Type (Disabled)", LABELS, disabled=True, key="target_type_disabled")
+elif source == "Real Data (77GHz)":
+    st.sidebar.info("📂 Using Zenodo Dataset (Drones/Birds)")
+    target = st.sidebar.selectbox("Target Type (Disabled)", LABELS, disabled=True, key="target_type_real")
 else:
     target = st.sidebar.selectbox("Target Type", LABELS, key="target_type_active")
 
@@ -644,7 +733,7 @@ with col1:
 with col2:
     st.markdown("""
     <div style='text-align: center; margin: 20px 0;'>
-        <h1 style='margin: 0; font-size: 2.8rem;'>🛰️ PHOTONIC RADAR COMMAND CENTER</h1>
+        <h1 style='margin: 0; font-size: 2.8rem;'>🛰️ PHOENIX-RADAR COMMAND CENTER</h1>
         <p style='color: #a0b4ff; letter-spacing: 2px; margin-top: 10px; font-size: 0.95rem;'>
             ⚡ AI-Enabled Cognitive Defense System | Real-Time Threat Detection & Tracking
         </p>
@@ -678,6 +767,15 @@ with status_col3:
 with status_col4:
     st.metric("Operator", st.session_state.user, border=True)
 
+# Periodically check integrity
+if time.time() - st.session_state.get('tamper_check_timer', 0) > 60:
+    st.session_state.tamper_detector.check_all_critical_files()
+    st.session_state.tamper_check_timer = time.time()
+
+unresolved = st.session_state.tamper_detector.get_unresolved_events()
+if unresolved:
+    st.error(f"🚨 SECURITY ALERT: {len(unresolved)} Integrity Violations Detected!")
+
 st.markdown("---")
 
 # Create Professional Tabs
@@ -703,21 +801,58 @@ if source == "RTL-SDR":
         except Exception as e:
             st.error(f"SDR Hardware Error: {e}. Falling back to simulation.")
             signal = generate_radar_signal(target_low, distance)
+elif source == "Real Data (77GHz)":
+    # Try to get next sample from loader
+    sample = st.session_state.real_loader.get_next_sample()
+    
+    if sample is None:
+        # Check if file actually exists to give better feedback
+        if not os.path.exists(st.session_state.real_loader.data_path):
+            st.error(f"❌ Real dataset file not found at: {st.session_state.real_loader.data_path}")
+            st.info("Please download the dataset manually or check the path.")
+        else:
+            st.error("❌ Failed to load dataset (unknown error). Check logs.")
+            
+        st.warning("⚠️ Falling back to simulation.")
+        signal = generate_radar_signal(target_low, distance)
+    else:
+        st.success(f"✅ DATA LOADED: Using sample from Zenodo Dataset (Shape: {sample.shape})")
+        # Ensure sample matches expected signal shape (4096,) for processing
+        # The dataset might be 2D chips, so we might need to flatten or select a row
+        if len(sample.shape) > 1:
+             # Basic adaptation: take the first row or flatten if small enough
+             signal = sample.flatten()[:4096]
+        else:
+             signal = sample[:4096]
+             
+        # Pad if too short
+        if len(signal) < 4096:
+            st.warning(f"Sample too short ({len(signal)}), padding with zeros.")
+            signal = np.pad(signal, (0, 4096 - len(signal)))
+            
+        # Normalize
+        signal = signal / (np.max(np.abs(signal)) + 1e-9)
+        signal *= 10 ** (gain / 20)
 else:
     signal = generate_radar_signal(target_low, distance)
 
-    signal *= 10 ** (gain / 20)
+signal *= 10 ** (gain / 20)
 
+try:
     # Run classical detection chain and only run AI if CFAR finds detections
-    detect_res = detect_targets_from_raw(signal, fs=4096, n_range=128, n_doppler=128, method='ca', guard=2, train=8, pfa=1e-6)
+    # Using cached wrapper
+    detect_res = cached_detect_targets(signal, fs=4096, n_range=128, n_doppler=128, method='ca', guard=2, train=8, pfa=1e-4)
     rd_map = detect_res['rd_map']
     spec, meta, photonic = None, None, None
 
     # Always compute features for UI / photonic params
-    rd_map, spec, meta, photonic = get_all_features(signal)
+    # Optimization: Pass pre-computed rd_map to avoid redundant FFT
+    # Using cached wrapper
+    rd_map, spec, meta, photonic = cached_get_all_features(signal, rd_map=rd_map)
 
     detections = detect_res.get('detections', [])
     ai_results = []
+    
     IMG_SIZE = 128
     det_cfg = cfg.get('detection', {})
     crop_size = int(det_cfg.get('crop_size', 32))
@@ -731,45 +866,111 @@ else:
             spec_resized_full = np.abs(spec)
 
         half = crop_size // 2
-        for det in detections:
+        batch_rd = []
+        batch_spec = []
+        batch_meta = []
+        batch_indices = []
+
+        # First pass: Collect valid crops
+        for idx_det, det in enumerate(detections):
             i, j, val = det
             i = int(i); j = int(j)
 
-            # pad rd_map and spec if crop goes out of bounds
-            pad_y = max(0, half - i, (i + half) - rd_map.shape[0] + 1)
-            pad_x = max(0, half - j, (j + half) - rd_map.shape[1] + 1)
-            if pad_x > 0 or pad_y > 0:
-                rd_pad = np.pad(rd_map, ((pad_y, pad_y), (pad_x, pad_x)), mode='constant')
-                spec_pad = np.pad(spec_resized_full, ((pad_y, pad_y), (pad_x, pad_x)), mode='constant')
-                i += pad_y
-                j += pad_x
-            else:
-                rd_pad = rd_map
-                spec_pad = spec_resized_full
+            try:
+                # pad rd_map and spec if crop goes out of bounds
+                pad_y = max(0, half - i, (i + half) - rd_map.shape[0] + 1)
+                pad_x = max(0, half - j, (j + half) - rd_map.shape[1] + 1)
+                
+                if pad_x > 0 or pad_y > 0:
+                    rd_pad = np.pad(rd_map, ((pad_y, pad_y), (pad_x, pad_x)), mode='constant')
+                    spec_pad = np.pad(spec_resized_full, ((pad_y, pad_y), (pad_x, pad_x)), mode='constant')
+                    i_adj = i + pad_y
+                    j_adj = j + pad_x
+                else:
+                    rd_pad = rd_map
+                    spec_pad = spec_resized_full
+                    i_adj = i
+                    j_adj = j
 
-            y1 = i - half; y2 = i + half
-            x1 = j - half; x2 = j + half
-            rd_crop = rd_pad[y1:y2, x1:x2]
-            spec_crop = spec_pad[y1:y2, x1:x2]
+                y1 = i_adj - half; y2 = i_adj + half
+                x1 = j_adj - half; x2 = j_adj + half
+                
+                # Double check bounds
+                if y1 < 0 or x1 < 0 or y2 > rd_pad.shape[0] or x2 > rd_pad.shape[1]:
+                    continue
 
-            # Resize to model input
-            rd_img = cv2.resize(rd_crop.astype(np.float32), (IMG_SIZE, IMG_SIZE))
-            spec_img = cv2.resize(spec_crop.astype(np.float32), (IMG_SIZE, IMG_SIZE))
+                rd_crop = rd_pad[y1:y2, x1:x2]
+                spec_crop = spec_pad[y1:y2, x1:x2]
+                
+                if rd_crop.size == 0 or spec_crop.size == 0:
+                    continue
 
-            # Normalize
-            rd_norm_local = (rd_img - np.mean(rd_img)) / (np.std(rd_img) + 1e-8)
-            spec_norm_local = (spec_img - np.mean(spec_img)) / (np.std(spec_img) + 1e-8)
+                # Resize to model input
+                rd_img = cv2.resize(rd_crop.astype(np.float32), (IMG_SIZE, IMG_SIZE))
+                spec_img = cv2.resize(spec_crop.astype(np.float32), (IMG_SIZE, IMG_SIZE))
 
-            rd_t_local = torch.from_numpy(rd_norm_local).float().unsqueeze(0).unsqueeze(0).to(device)
-            spec_t_local = torch.from_numpy(spec_norm_local).float().unsqueeze(0).unsqueeze(0).to(device)
-            meta_t_local = torch.from_numpy(meta).float().unsqueeze(0).to(device)
+                # Normalize (Standardize)
+                rd_std = np.std(rd_img) + 1e-8
+                spec_std = np.std(spec_img) + 1e-8
+                rd_norm_local = (rd_img - np.mean(rd_img)) / rd_std
+                spec_norm_local = (spec_img - np.mean(spec_img)) / spec_std
 
-            with torch.no_grad():
-                out = radar_model(rd_t_local, spec_t_local, meta_t_local)
-                ps = torch.softmax(out, dim=1)
-                conf, idx = float(torch.max(ps)), int(torch.argmax(ps))
-                label = LABELS[idx] if idx < len(LABELS) else 'Clutter'
-                ai_results.append({"det": (i, j), "label": label, "confidence": conf, "value": val})
+                batch_rd.append(rd_norm_local)
+                batch_spec.append(spec_norm_local)
+                batch_meta.append(meta)
+                batch_indices.append(idx_det)
+            
+            except Exception as e:
+                # Log specific error but don't crash
+                # log_event(f"Error processing detection crop: {e}", level="warning")
+                continue
+
+        # Batch Inference
+        if len(batch_rd) > 0:
+            try:
+                # Stack into [B, 1, IMG_SIZE, IMG_SIZE]
+                rd_t_batch = torch.from_numpy(np.array(batch_rd)).float().unsqueeze(1).to(device)
+                spec_t_batch = torch.from_numpy(np.array(batch_spec)).float().unsqueeze(1).to(device)
+                meta_t_batch = torch.from_numpy(np.array(batch_meta)).float().to(device)
+
+                with torch.no_grad():
+                    out_batch = radar_model(rd_t_batch, spec_t_batch, meta_t_batch)
+                    
+                    # AI Hardening: Confidence & OOD
+                    ce = st.session_state.ai_hardening['conf_estimator']
+                    ood = st.session_state.ai_hardening['ood_detector']
+                    
+                    # Estimate confidence for batch (assuming CE supports batch, otherwise loop)
+                    # Check if CE supports batch. If not, simple softmax here.
+                    # Standard softmax for batch
+                    ps_batch = torch.softmax(out_batch, dim=1)
+                    
+                    # Process results
+                    for k, idx_det in enumerate(batch_indices):
+                        out_single = out_batch[k:k+1] # Keep batch dim for compatibility
+                        
+                        # Use existing hardening objects (assuming they handle single items)
+                        conf, entropy = ce.estimate(out_single)
+                        is_ood, ood_score = ood.detect(out_single)
+                        
+                        ps = ps_batch[k]
+                        cls_idx = int(torch.argmax(ps))
+                        label = LABELS[cls_idx] if cls_idx < len(LABELS) else 'Clutter'
+                        
+                        det_orig = detections[idx_det]
+                        
+                        ai_results.append({
+                            "det": (det_orig[0], det_orig[1]), 
+                            "label": label, 
+                            "confidence": conf, 
+                            "value": det_orig[2],
+                            "entropy": entropy,
+                            "is_ood": is_ood,
+                            "ood_score": ood_score
+                        })
+            except Exception as e:
+                st.error(f"Batch inference failed: {e}")
+                log_event(f"Batch inference error: {e}", level="error")
 
         # choose highest-confidence detection for top-level UI
         best = max(ai_results, key=lambda x: x['confidence']) if ai_results else None
@@ -871,42 +1072,57 @@ else:
             target = cognitive_action.target_type
             log_event(f"Cognitive adaptation: gain={gain:.1f}dB, dist={distance:.0f}m, target={target}", level="info")
 
-rd_map_resized = cv2.resize(rd_map, (128, 128))
-spec_resized = cv2.resize(spec, (128, 128))
+    rd_map_resized = cv2.resize(rd_map, (128, 128))
+    spec_resized = cv2.resize(spec, (128, 128))
 
-rd_norm = rd_map_resized / (np.max(rd_map_resized) + 1e-8)
-spec_norm = spec_resized / (np.max(spec_resized) + 1e-8)
-rd_t = torch.from_numpy(rd_norm).float().unsqueeze(0).unsqueeze(0).to(device) # (1, 1, 128, 128)
-spec_t = torch.from_numpy(spec_norm).float().unsqueeze(0).unsqueeze(0).to(device) # (1, 1, 128, 128)
-meta_t = torch.from_numpy(meta).float().unsqueeze(0).to(device)
-with torch.no_grad():
-    output = radar_model(rd_t, spec_t, meta_t)
-    probs = torch.softmax(output, dim=1)
-    confidence = float(torch.max(probs))
-    detected_idx = int(torch.argmax(probs))
-    detected = LABELS[detected_idx] if detected_idx < len(LABELS) else "Clutter"
+    rd_norm = rd_map_resized / (np.max(rd_map_resized) + 1e-8)
+    spec_norm = spec_resized / (np.max(spec_resized) + 1e-8)
+    rd_t = torch.from_numpy(rd_norm).float().unsqueeze(0).unsqueeze(0).to(device) # (1, 1, 128, 128)
+    spec_t = torch.from_numpy(spec_norm).float().unsqueeze(0).unsqueeze(0).to(device) # (1, 1, 128, 128)
+    meta_t = torch.from_numpy(meta).float().unsqueeze(0).to(device)
+    with torch.no_grad():
+        output = radar_model(rd_t, spec_t, meta_t)
+        probs = torch.softmax(output, dim=1)
+        confidence = float(torch.max(probs))
+        detected_idx = int(torch.argmax(probs))
+        detected = LABELS[detected_idx] if detected_idx < len(LABELS) else "Clutter"
 
-st.session_state.track_history = st.session_state.track_history[-50:]
+    st.session_state.track_history = st.session_state.track_history[-50:]
 
-# Cognitive threshold
-thresh = adaptive_threshold(photonic['noise_power']) + st.session_state.get('sensitivity_offset', 0.0)
-is_alert = confidence > thresh
+    # Cognitive threshold
+    thresh = adaptive_threshold(photonic['noise_power']) + st.session_state.get('sensitivity_offset', 0.0)
+    is_alert = confidence > thresh
 
-# Kafka Streaming (Optional)
-if "kafka_producer" not in st.session_state:
-    st.session_state.kafka_producer = get_producer()
+    # Kafka Streaming (Optional)
+    if "kafka_producer" not in st.session_state:
+        st.session_state.kafka_producer = get_producer()
 
-try:
-    producer = st.session_state.kafka_producer
-    if producer:
-        producer.send("radar-stream", {
-            "time": time.time(),
-            "target": detected,
-            "confidence": float(confidence),
-            "distance": float(distance)
-        })
-except Exception:
-    pass
+    try:
+        producer = st.session_state.kafka_producer
+        if producer:
+            producer.send("radar-stream", {
+                "time": time.time(),
+                "target": detected,
+                "confidence": float(confidence),
+                "distance": float(distance)
+            })
+    except Exception:
+        pass
+
+except Exception as e:
+    st.error(f"Processing Error: {e}")
+    log_event(f"CRITICAL PIPELINE ERROR: {str(e)}", level="error")
+    # Set default values so UI doesn't crash
+    detected = "Error"
+    confidence = 0.0
+    rd_map = np.zeros((128, 128))
+    spec = np.zeros((128, 128))
+    meta = np.zeros(8)
+    active_tracks = {}
+    is_alert = False
+    thresh = 0.5
+    photonic = {'noise_power': 0, 'clutter_power': 0, 'instantaneous_bandwidth': 0, 'chirp_slope': 0, 'pulse_width': 0, 'ttd_vector': []}
+
 
 # ===============================
 # TAB 1: ANALYTICS
@@ -915,17 +1131,190 @@ with tab1:
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        # 3D VISUALIZATION UPGRADE
+        st.subheader("Interactive Radar Analysis")
+        
+        rd_db = 10 * np.log10(rd_map + 1e-12)
+        
+        # Color mapping for targets
+        COLOR_MAP = {
+            "Drone": "#FFA500",      # Orange
+            "Aircraft": "#00FFFF",   # Cyan
+            "Bird": "#00FF00",       # Green
+            "Helicopter": "#FF00FF", # Magenta
+            "Missile": "#FF0000",    # Red
+            "Clutter": "#808080"     # Gray
+        }
 
-        im1 = ax1.imshow(10 * np.log10(rd_map + 1e-12), cmap="viridis", aspect='auto')
-        ax1.set_title("Range-Doppler Map")
-        plt.colorbar(im1, ax=ax1)
+        # Container for plot to ensure clean replacement
+        plot_container = st.empty()
+        
+        with plot_container:
+            if perf_mode:
+                # FAST 2D HEATMAP
+                # Downsample for speed if needed, but 128x128 is usually fine for 2D
+                fig_rd_3d = go.Figure(data=go.Heatmap(
+                    z=rd_db,
+                    colorscale='Viridis',
+                    zmin=-30, zmax=30,
+                    hoverinfo='z'
+                ))
+                
+                # Add markers to 2D view using Classification Results (ai_results)
+                if 'ai_results' in locals() and ai_results:
+                    for res in ai_results:
+                        r_idx, d_idx = res['det']
+                        label = res['label']
+                        conf = res['confidence'] * 100
+                        color = COLOR_MAP.get(label, "#FFFFFF")
+                        
+                        fig_rd_3d.add_trace(go.Scatter(
+                            x=[d_idx], y=[r_idx],
+                            mode='markers+text',
+                            marker=dict(size=14, color=color, symbol='circle-open', line=dict(width=3, color=color)),
+                            text=[f"{label}"],
+                            textposition="top center",
+                            textfont=dict(color=color, size=12, family="Orbitron"),
+                            hoverinfo='text',
+                            hovertext=f"Type: {label}<br>Conf: {conf:.1f}%<br>R: {r_idx}, D: {d_idx}",
+                            name=label,
+                            showlegend=False
+                        ))
+                # Fallback to raw detections if no AI results yet (or if AI disabled/failed)
+                elif detections:
+                    det_x = [d[1] for d in detections]
+                    det_y = [d[0] for d in detections]
+                    fig_rd_3d.add_trace(go.Scatter(
+                        x=det_x, y=det_y,
+                        mode='markers',
+                        marker=dict(size=10, color='rgba(255, 50, 50, 0.8)', symbol='circle-open', line=dict(width=2)),
+                        name='Unclassified'
+                    ))
 
-        im2 = ax2.imshow(10 * np.log10(spec + 1e-12), cmap="magma", aspect='auto')
-        ax2.set_title("Micro-Doppler Spectrogram")
-        plt.colorbar(im2, ax=ax2)
+                fig_rd_3d.update_layout(
+                    title='Range-Doppler Map (2D) - Target ID',
+                    xaxis_title='Doppler',
+                    yaxis_title='Range',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#00f0ff'),
+                    margin=dict(l=0, r=0, b=0, t=30),
+                    height=400
+                )
+                # Unique key prevents ghosting
+                st.plotly_chart(fig_rd_3d, use_container_width=True, key=f"rd_2d_{perf_mode}")
+            else:
+                # FULL 3D SURFACE
+                fig_rd_3d = go.Figure(data=[go.Surface(
+                    z=rd_db, 
+                    colorscale='Viridis', 
+                    contours_z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project_z=True),
+                    opacity=0.9
+                )])
+                
+                # Overlay Detections (3D) with ID
+                if 'ai_results' in locals() and ai_results:
+                    for res in ai_results:
+                        r_idx, d_idx = res['det']
+                        label = res['label']
+                        conf = res['confidence'] * 100
+                        color = COLOR_MAP.get(label, "#FFFFFF")
+                        z_val = rd_db[int(r_idx), int(d_idx)] + 10
+                        
+                        fig_rd_3d.add_trace(go.Scatter3d(
+                            x=[d_idx], y=[r_idx], z=[z_val],
+                            mode='markers+text',
+                            marker=dict(size=12, color=color, symbol='circle', line=dict(color='white', width=2)),
+                            text=[f"{label}"],
+                            textposition="top center",
+                            textfont=dict(color=color, size=14, family="Orbitron"),
+                            hovertext=f"Type: {label}<br>Conf: {conf:.1f}%",
+                            hoverinfo='text',
+                            name=label
+                        ))
+                elif detections:
+                    det_x = [d[1] for d in detections]  # Doppler
+                    det_y = [d[0] for d in detections]  # Range
+                    det_z = [rd_db[int(d[0]), int(d[1])] + 10 for d in detections] # Lift above surface explicitly
+                    
+                    fig_rd_3d.add_trace(go.Scatter3d(
+                        x=det_x, y=det_y, z=det_z,
+                        mode='markers',
+                        marker=dict(size=10, color='rgba(255, 30, 30, 0.9)', symbol='circle', line=dict(color='rgba(255, 200, 200, 1.0)', width=2)),
+                        name='Detected Target'
+                    ))
 
-        st.pyplot(fig)
+                fig_rd_3d.update_layout(
+                    title='3D Range-Doppler Map - Enhanced ID',
+                    autosize=True,
+                    scene=dict(
+                        xaxis_title='Doppler',
+                        yaxis_title='Range',
+                        zaxis_title='Intensity (dB)',
+                        xaxis=dict(gridcolor='rgba(0, 240, 255, 0.2)'),
+                        yaxis=dict(gridcolor='rgba(0, 240, 255, 0.2)'),
+                        zaxis=dict(gridcolor='rgba(0, 240, 255, 0.2)'),
+                        bgcolor="rgba(0,0,0,0)"
+                    ),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#00f0ff'),
+                    margin=dict(l=0, r=0, b=0, t=30),
+                    height=500,
+                    scene_camera=dict(eye=dict(x=1.6, y=1.6, z=1.2))
+                )
+                # Unique key prevents ghosting
+                st.plotly_chart(fig_rd_3d, use_container_width=True, key=f"rd_3d_{perf_mode}")
+
+                
+
+
+        # 2. Spectrogram
+        spec_db = 10 * np.log10(spec + 1e-12)
+        
+        spec_container = st.empty()
+        with spec_container:
+            if perf_mode:
+                # FAST 2D HEATMAP
+                fig_spec_3d = go.Figure(data=go.Heatmap(
+                    z=spec_db,
+                    colorscale='Magma',
+                    zmin=-30, zmax=30
+                ))
+                fig_spec_3d.update_layout(
+                    title='Micro-Doppler Spectrogram (2D)',
+                    xaxis_title='Time',
+                    yaxis_title='Frequency',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#bc13fe'),
+                    margin=dict(l=0, r=0, b=0, t=30),
+                    height=400
+                )
+                st.plotly_chart(fig_spec_3d, use_container_width=True, key=f"spec_2d_{perf_mode}")
+            else:
+                fig_spec_3d = go.Figure(data=[go.Surface(
+                    z=spec_db, 
+                    colorscale='Magma', 
+                    opacity=0.9
+                )])
+                fig_spec_3d.update_layout(
+                    title='3D Micro-Doppler Spectrogram',
+                    autosize=True,
+                    scene=dict(
+                        xaxis_title='Time',
+                        yaxis_title='Frequency',
+                        zaxis_title='Intensity (dB)',
+                        xaxis=dict(gridcolor='rgba(188, 19, 254, 0.2)'),
+                        yaxis=dict(gridcolor='rgba(188, 19, 254, 0.2)'),
+                        zaxis=dict(gridcolor='rgba(188, 19, 254, 0.2)'),
+                        bgcolor="rgba(0,0,0,0)"
+                    ),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#bc13fe'),
+                    margin=dict(l=0, r=0, b=0, t=30),
+                    height=500
+                )
+                st.plotly_chart(fig_spec_3d, use_container_width=True, key=f"spec_3d_{perf_mode}")
 
         # Tracking Plot (3D Upgrade)
         st.subheader("🎯 Target Tracking (Kalman Filter) — 3D View")
@@ -1002,6 +1391,21 @@ with tab1:
         st.write(f"Priority: **{PRIORITY[detected]}**")
 
         st.markdown("---")
+        st.subheader("📋 Active Targets")
+        if 'ai_results' in locals() and ai_results:
+            target_list_data = []
+            for res in ai_results:
+                target_list_data.append({
+                    "Type": res['label'],
+                    "Range": f"{res['det'][0]}", # Just index for now
+                    "Conf": f"{res['confidence']*100:.0f}%"
+                })
+            
+            st.table(pd.DataFrame(target_list_data))
+        else:
+            st.caption("No classified targets")
+
+        st.markdown("---")
         st.subheader("Phase Statistics")
         if len(meta) >= 3:
             st.write(f"Mean Phase: {meta[0]:.4f}")
@@ -1036,9 +1440,9 @@ with tab2:
                     st.pyplot(fig_rd)
                 else:
                     st.info("Grad-CAM unavailable - showing RD Map")
-                    st.image(rd_norm, caption="RD Map", use_column_width=True, channels='GRAY')
+                    st.image(rd_norm, caption="RD Map", use_container_width=True, channels='GRAY')
             else:
-                st.image(rd_norm, caption="RD Map", use_column_width=True, channels='GRAY')
+                st.image(rd_norm, caption="RD Map", use_container_width=True, channels='GRAY')
 
         with col_xai2:
             st.write("**Spectrogram Heatmap**")
@@ -1052,17 +1456,17 @@ with tab2:
                     st.pyplot(fig_sp)
                 else:
                     st.info("Grad-CAM unavailable - showing Spectrogram")
-                    st.image(spec_norm, caption="Spectrogram", use_column_width=True, channels='GRAY')
+                    st.image(spec_norm, caption="Spectrogram", use_container_width=True, channels='GRAY')
             else:
-                st.image(spec_norm, caption="Spectrogram", use_column_width=True, channels='GRAY')
+                st.image(spec_norm, caption="Spectrogram", use_container_width=True, channels='GRAY')
     except Exception as e:
         st.error(f"XAI Visualization Error: {e}")
         st.info("Showing raw input maps instead...")
         col_xai1, col_xai2 = st.columns(2)
         with col_xai1:
-            st.image(rd_norm, caption="RD Map", use_column_width=True, channels='GRAY')
+            st.image(rd_norm, caption="RD Map", use_container_width=True, channels='GRAY')
         with col_xai2:
-            st.image(spec_norm, caption="Spectrogram", use_column_width=True, channels='GRAY')
+            st.image(spec_norm, caption="Spectrogram", use_container_width=True, channels='GRAY')
 
 # ===============================
 # TAB 3: PHOTONIC PARAMETERS
@@ -1099,6 +1503,10 @@ with tab4:
             "Priority": PRIORITY[detected]
         }
         st.session_state.history.append(entry)
+        # Optimization: Cap history to prevent memory leak
+        if len(st.session_state.history) > 1000:
+            st.session_state.history = st.session_state.history[-1000:]
+
         st.session_state.last_log_time = current_time
         
         if is_alert:
@@ -1128,7 +1536,7 @@ with tab5:
     else:
         st.subheader("🛠️ Administrative Controls")
         
-        admin_subtab1, admin_subtab2, admin_subtab3 = st.tabs(["User Management", "System Health", "Advanced Config"])
+        admin_subtab1, admin_subtab2, admin_subtab3, admin_subtab4 = st.tabs(["User Management", "System Health", "Advanced Config", "Security Audit"])
         
         with admin_subtab1:
             from src.user_manager import list_users, create_user, delete_user, update_user_role
@@ -1199,11 +1607,44 @@ with tab5:
                 st.success("Logs cleared")
                 st.rerun()
 
+        with admin_subtab4:
+            st.markdown("### Security & Integrity Audit")
+            
+            events = st.session_state.tamper_detector.get_tamper_events()
+            if events:
+                for i, event in enumerate(events):
+                    e_dict = event.to_dict()
+                    cols = st.columns([1, 4, 2])
+                    with cols[0]:
+                        if e_dict['severity'] == 'critical':
+                            st.error(f"CRITICAL")
+                        else:
+                            st.warning(f"WARN")
+                    with cols[1]:
+                        st.write(f"**{e_dict['filepath']}**: {e_dict['reason']}")
+                        st.caption(f"Time: {e_dict['timestamp']}")
+                    with cols[2]:
+                        if not e_dict['resolved']:
+                            if st.button("Mark Resolved", key=f"resolve_{i}"):
+                                st.session_state.tamper_detector.mark_event_resolved(i)
+                                st.rerun()
+                        else:
+                            st.success("Resolved")
+                    st.divider()
+            else:
+                st.success("✅ System Integrity Verified. No incidents.")
+                
+            if st.button("Run Integrity Check Now"):
+                st.session_state.tamper_detector.check_all_critical_files()
+                st.rerun()
+
 # ===============================
 # SAFE AUTO-REFRESH
 # ===============================
 if animate:
-    time.sleep(0.5)
+    # Adaptive sleep based on performance mode
+    sleep_time = 1.0 if perf_mode else 0.5
+    time.sleep(sleep_time)
     # Streamlit recommends using fragment for local updates or 
     # being careful with rerun in loops.
     # To prevent rapid-fire reruns that can cause "script already running" errors,

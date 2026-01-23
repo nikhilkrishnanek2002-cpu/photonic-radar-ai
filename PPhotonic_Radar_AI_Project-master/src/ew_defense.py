@@ -284,8 +284,8 @@ class FrequencyHopper:
             base_freq_hz: base carrier frequency (Hz)
             hop_set_size: number of frequencies to hop across
         """
-        self.base_freq_hz = base_freq_hz
-        self.hop_set_size = hop_set_size
+        self.base_freq_hz = float(base_freq_hz)
+        self.hop_set_size = int(hop_set_size)
         self.freq_offset_step = 50e6  # 50 MHz steps
         self.current_hop_index = 0
         self.hop_sequence = []

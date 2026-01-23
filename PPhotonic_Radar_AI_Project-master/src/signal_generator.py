@@ -37,7 +37,8 @@ def generate_radar_signal(target_type, distance=100, fs=4096):
     
     # Distance attenuation with some randomness
     dist_jitter = distance * np.random.uniform(0.95, 1.05)
-    attenuation = (100 / max(dist_jitter, 1)) ** 2
+    # Boosted attenuation for demo purposes (was 100/dist**2)
+    attenuation = (150 / max(dist_jitter, 1)) ** 1.5
 
     # Randomize chirp parameters slightly for each generation
     f0_offset = np.random.uniform(-100, 100)

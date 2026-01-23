@@ -4,7 +4,7 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$PROJECT_DIR"
+cd "$PROJECT_DIR/.."
 
 echo "🚀 Photonic Radar AI - Startup"
 echo "=============================="
@@ -20,6 +20,12 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}Checking Python environment...${NC}"
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 echo -e "${GREEN}✓${NC} Python $PYTHON_VERSION"
+
+# Auto-install deps if requirements.txt exists
+if [ -f "requirements.txt" ]; then
+    echo -e "${BLUE}Ensuring dependencies are installed...${NC}"
+    pip install -r requirements.txt > /dev/null 2>&1 || true
+fi
 echo ""
 
 # Check core validation

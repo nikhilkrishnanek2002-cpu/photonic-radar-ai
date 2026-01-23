@@ -2,6 +2,7 @@
 # Quick Start - Photonic Radar AI Core
 
 set -e
+cd "$(dirname "$0")/.."
 
 echo "🚀 Photonic Radar AI - Core Quick Start"
 echo "========================================"

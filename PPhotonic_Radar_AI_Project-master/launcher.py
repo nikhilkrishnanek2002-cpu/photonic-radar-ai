@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI Cognitive Photonic Radar - Project Launcher
+AI Cognitive Photonic Radar - PHOENIX-RADAR Project Launcher
 Main entry point for the radar application.
 """
 
@@ -35,19 +35,42 @@ def check_dependencies():
     for package, module in packages.items():
         try:
             __import__(module)
-        except ImportError:
+            # print(f"✅ {package} ok") # Debug
+        except ImportError as e:
+            print(f"❌ Failed to import {package} ({module}): {e}")
             missing.append(package)
+        except Exception as e:
+             print(f"❌ Error importing {package}: {e}")
+             missing.append(package)
     
     if missing:
         print(f"⚠️  Missing packages: {', '.join(missing)}")
-        print("Install with: pip install -r requirements.txt")
-        return False
+        print("Attempting automatic installation...")
+        
+        try:
+            import subprocess
+            # Install missing packages
+            # Note: We need to map module names back to package names for pip if they differ
+            reverse_map = {v: k for k, v in packages.items()}
+            # Some manual corrections for packages where import name != package name
+            # already handled by the 'packages' dict keys, mostly.
+            
+            packages_to_install = [p for p in missing]
+            
+            subprocess.check_call([sys.executable, "-m", "pip", "install"] + packages_to_install)
+            print("✅ Dependencies installed successfully! Restarting...")
+            return True
+        except Exception as e:
+            print(f"❌ Auto-install failed: {e}")
+            print("Please run manually: pip install -r requirements.txt")
+            return False
+            
     return True
 
 
 def launch():
     """Launch the Streamlit application."""
-    print("🚀 Starting AI Cognitive Photonic Radar Web Interface...")
+    print("🚀 Starting PHOENIX-RADAR: Cognitive Photonic Radar with AI...")
     print("-" * 60)
     
     try:

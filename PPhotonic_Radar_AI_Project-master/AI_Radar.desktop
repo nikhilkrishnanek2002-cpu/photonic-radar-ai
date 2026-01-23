@@ -1,10 +1,10 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=AI Cognitive Radar
+Name=PHOENIX-RADAR
 Comment=AI-Powered Radar Signal Analysis System
-Exec=/usr/bin/python3 /home/nikhil/PycharmProjects/PPhotonic_Radar_AI_Project/launcher.py
-Icon=radar
+Exec=/bin/bash "/home/nikhil/PycharmProjects/PPhotonic_Radar_AI_Project-master (2)/PPhotonic_Radar_AI_Project-master/scripts/launcher.sh"
+Icon=utilities-terminal
 Terminal=true
 Categories=Science;Education;
 StartupNotify=true

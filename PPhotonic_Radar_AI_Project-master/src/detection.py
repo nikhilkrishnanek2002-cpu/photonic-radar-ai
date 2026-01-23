@@ -121,6 +121,16 @@ def detect_targets_from_raw(signal: np.ndarray, fs: float = 4096, n_range: int =
 
     Returns dict with rd_map, det_map, detections (list of (i,j,value)), and stats.
     """
+    # Validation
+    if signal is None or len(signal) == 0:
+        log_event("Empty signal received in detection pipeline", level="warning")
+        return {
+            "rd_map": np.zeros((n_doppler, n_range)),
+            "det_map": np.zeros((n_doppler, n_range), dtype=bool),
+            "detections": [],
+            "stats": {"num_detections": 0, "error": "Empty signal"}
+        }
+
     # Reshape into pulses
     num_pulses = len(signal) // n_range
     if num_pulses == 0:

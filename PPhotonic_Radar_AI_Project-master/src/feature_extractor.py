@@ -64,8 +64,9 @@ def estimate_photonic_parameters(signal, bandwidth=1e9, pulse_width=10e-6):
         "clutter_power": float(clutter_power)
     }
 
-def get_all_features(signal, fs=4096):
-    rd_map = extract_range_doppler(signal)
+def get_all_features(signal, fs=4096, rd_map=None):
+    if rd_map is None:
+        rd_map = extract_range_doppler(signal)
     spectrogram = extract_micro_doppler(signal, fs=fs)
     phase_stats = extract_phase_statistics(signal)
     photonic_params = estimate_photonic_parameters(signal)

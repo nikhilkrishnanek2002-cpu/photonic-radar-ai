@@ -2,6 +2,7 @@
 # Core Test Runner - Quick validation and diagnostics
 
 echo "🚀 Photonic Radar AI - Core Test Suite"
+cd "$(dirname "$0")/.."
 echo "========================================"
 echo ""
 

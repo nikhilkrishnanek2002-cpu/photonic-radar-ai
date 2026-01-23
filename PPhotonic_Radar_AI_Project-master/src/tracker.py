@@ -194,6 +194,9 @@ class MultiTargetTracker:
         Returns:
             dict: track_id -> detection_index or None (unmatched)
         """
+        if detections is None:
+            detections = []
+            
         if not detections or not self.tracks:
             return {tid: None for tid in self.tracks}
         
@@ -214,7 +217,12 @@ class MultiTargetTracker:
             # No feasible assignments
             track_indices, det_indices = [], []
         else:
-            track_indices, det_indices = linear_sum_assignment(cost_matrix)
+            # Replace inf with large finite value to prevent "cost matrix is infeasible" error
+            # This ensures the solver always finds a solution, which we filter later
+            large_val = 1e6
+            solver_cost_matrix = cost_matrix.copy()
+            solver_cost_matrix[np.isinf(solver_cost_matrix)] = large_val
+            track_indices, det_indices = linear_sum_assignment(solver_cost_matrix)
         
         result = {}
         for tid in self.tracks:

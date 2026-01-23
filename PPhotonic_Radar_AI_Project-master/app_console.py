@@ -43,7 +43,7 @@ _startup = run_startup_checks()
 # STREAMLIT CONFIGURATION
 # ===============================
 st.set_page_config(
-    page_title="Military Radar Console",
+    page_title="PHOENIX-RADAR Console",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -217,7 +217,7 @@ with col_s2:
 # Header with mode indicator
 st.markdown(f"""
 <div style="text-align: center; margin-bottom: 20px;">
-    <h1>🛰️ MILITARY RADAR CONSOLE 🛰️</h1>
+    <h1>🛰️ PHOENIX-RADAR CONSOLE 🛰️</h1>
     <h3 style="color: #00ff88; margin-top: -10px;">
         MODE: [{st.session_state.mode.value.upper()}] | OPERATOR: {operator} | SECTOR: {sector}
     </h3>
