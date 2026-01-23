@@ -1,53 +1,98 @@
-# PHOENIX-RADAR: Cognitive Photonic Radar with AI
+# 📡 PHOENIX-RADAR: Cognitive Photonic Radar with AI
 
-Professional defence-research-grade AI-enabled cognitive photonic radar simulation.
+![Status](https://img.shields.io/badge/Status-Operational-00f2ff)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
+![Framework](https://img.shields.io/badge/Streamlit-App-red)
 
-## Features
-- **Photonic Radar Signal Simulation**: High-bandwidth I/Q signal generation with micro-Doppler components.
-- **Advanced Feature Extraction**: 
-  - 2D Range-Doppler maps (2D FFT).
-  - Micro-Doppler spectrograms (STFT).
-  - Phase statistics (Coherence, Variance).
-  - Photonic metadata (Instantaneous bandwidth, Chirp slope, TTD beamforming).
-- **PyTorch AI Architecture**:
-  - Multi-input fusion model.
-  - Dual CNN branches for spatial feature extraction.
-  - Dense branch for metadata integration.
-- **Professional Dashboard**:
-  - Tab-based Streamlit UI with multi-tab interface.
-  - **Real-time Target Tracking**: Kalman filter integration with trajectory visualization.
-  - **Explainable AI (XAI)**: Grad-CAM heatmaps for decision transparency.
-  - **Cognitive Logic**: Adaptive detection thresholds based on environmental noise and **Admin-adjustable sensitivity**.
-  - **Hardware & Streaming**: 
-    - Optional RTL-SDR integration with automatic fallback to simulation if `librtlsdr` is missing.
-    - Optional Kafka-based data bus for real-time result streaming.
-    - Robust error handling for all external dependencies.
-  - **Admin Control Center**:
-    - Multi-user authentication (RBAC) with dedicated Admin Panel.
-    - System health monitoring (CPU, RAM, Hardware, DB).
-    - User management (CRUD operations for operators and viewers).
-    - Advanced system tuning and log management.
-  - Real-time analytics and photonic parameter monitoring.
+**A next-generation simulation and control platform for Cognitive Photonic Radar systems.**
 
-## How to use on Desktop
+This project simulates a high-frequency Photonic Radar system (FMCW/Heterodyne) and uses AI to classify targets based on their micro-Doppler signatures. It features a professional "Command Center" dashboard for real-time monitoring and control.
 
-### 🐧 Linux (Desktop Shortcut)
-1. Ensure you have the project installed and dependencies met.
-2. Locate the `AI_Radar.desktop` file in the project root.
-3. Copy it to your desktop or applications folder:
-   ```bash
-   cp AI_Radar.desktop ~/Desktop/
-   ```
-4. Right-click the file on your desktop and select **"Allow Launching"** (on GNOME/KDE).
-5. Double-click the icon to start the application.
+## 🌟 Key Features
 
-### 🪟 Windows (Batch Launcher)
-1. Locate the `run_radar.bat` file in the project root.
-2. Right-click it and select **"Send to" -> "Desktop (create shortcut)"**.
-3. Double-click the shortcut to start the application.
+- **Physics-Based Simulation**:
+  - Photonic-generation of RF signals (Laser Phase Noise, Heterodyne Mixing).
+  - Realistic FMCW Chirp, Delay, and Doppler modeling.
+  - Simulation of **Drones**, **Birds**, **Aircraft**, **Missiles**, and **Clutter**.
+  
+- **Advanced Signal Processing**:
+  - **Range-Doppler Maps** (2D FFT implementation).
+  - **Micro-Doppler Spectrograms** (STFT).
+  - Accurate CA-CFAR Detection.
 
-### 🐍 Manual Command
-You can always run the application from the terminal:
+- **AI/ML Integration**:
+  - Multi-branch CNN Architecture (`RangeDoppler` + `Spectrogram` Fusion).
+  - **Explainable AI (XAI)**: Strategic analysis and feature attribution for every detection.
+  - Real-time Inference Engine with confidence metrics.
+
+- **Research Benchmarking**:
+  - Automated sensitivity curves (Pd vs SNR).
+  - Operational reliability analysis (Pfa vs Threshold).
+  - AI Robustness and Computational Latency benchmarks.
+
+## 🏗️ Architecture
+
+The project follows a clean, modular Layered Architecture:
+
+| Layer | Directory | Description |
+|-------|-----------|-------------|
+| **Simulation** | `src/simulation/` | Photonic core, target responses, noise models, and scenarios. |
+| **DSP** | `src/dsp/` | Signal transforms (2D-FFT, STFT), performance metrics, and evaluation tools. |
+| **AI** | `src/ai/` | PyTorch models, Inference pipeline, and XAI modules. |
+| **Analytics** | `src/analytics/` | Comparative analysis, benchmarking engine, and failure analysis. |
+| **UI** | `src/ui/` | "Design-system" driven UI components and layout logic. |
+| **Interfaces** | `src/interfaces/` | Future-proof hooks for SDR, FPGA, and real-world data integration. |
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.8+
+- Linux/Windows/MacOS
+
+### Installation
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/your-repo/PPhotonic_Radar_AI_Project.git
+    cd PPhotonic_Radar_AI_Project
+    ```
+
+2.  **Install Dependencies**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### Usage
+
+1.  **Launch the Dashboard**:
+    ```bash
+    streamlit run app.py
+    ```
+    This will open the "Command Center" in your default web browser (usually http://localhost:8501).
+
+2.  **Simulation Mode**:
+    - Select **Simulation** in the Sidebar.
+    - Use the **Target Manager** to add/remove targets (e.g., set up a "Drone" at 50m with 10m/s velocity).
+    - Click **RUN SIMULATION**.
+    - Observe the real-time **Range-Doppler Map** and **AI Classification**.
+
+### Verification
+
+To verify the system integrity (useful for CI/CD or initial setup):
 ```bash
-python launcher.py
+python3 tests/verify_pipeline.py
 ```
+
+## 🛠️ Future Scope
+
+- **Hardware-in-the-Loop (HIL)**: Integrate with RTL-SDR or SDRplay for real-time RF capture.
+- **XAI (Explainable AI)**: Visualize Grad-CAM activation maps on the Range-Doppler input.
+- **Tracking**: Implement Kalman Filter for multi-object tracking (MOT).
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+*Designed for DRDO/Research Applications.*

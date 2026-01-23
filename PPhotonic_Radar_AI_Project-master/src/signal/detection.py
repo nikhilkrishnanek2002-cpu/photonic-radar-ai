@@ -8,8 +8,8 @@ configurable via `src.config.get_config()` under key `detection`.
 """
 from typing import Tuple, List, Dict, Optional
 import numpy as np
-from .config import get_config
-from .logger import log_event
+from src.config import get_config
+from src.logger import log_event
 
 
 def matched_filter(received: np.ndarray, template: np.ndarray) -> np.ndarray:
@@ -115,6 +115,8 @@ def os_cfar(rd_map: np.ndarray, guard: int = 2, train: int = 16, rank: Optional[
     return det, 1.0
 
 
+from src.signal.transforms import compute_range_doppler_map
+
 def detect_targets_from_raw(signal: np.ndarray, fs: float = 4096, n_range: int = 128, n_doppler: int = 128,
                             method: str = "ca", **kwargs) -> Dict:
     """Full detection pipeline from raw complex signal to detection list.
@@ -131,13 +133,8 @@ def detect_targets_from_raw(signal: np.ndarray, fs: float = 4096, n_range: int =
             "stats": {"num_detections": 0, "error": "Empty signal"}
         }
 
-    # Reshape into pulses
-    num_pulses = len(signal) // n_range
-    if num_pulses == 0:
-        rd_map = np.zeros((n_doppler, n_range))
-    else:
-        pulses = signal[:num_pulses * n_range].reshape(num_pulses, n_range)
-        rd_map = range_doppler_map(pulses, n_range=n_range, n_doppler=n_doppler)
+    # Use centralized transform
+    rd_map = compute_range_doppler_map(signal, n_range=n_range, n_doppler=n_doppler)
 
     if method.lower().startswith("ca"):
         det_map, alpha = ca_cfar(rd_map, **kwargs)

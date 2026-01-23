@@ -34,7 +34,7 @@ Example:
 from typing import Optional, Dict, Tuple
 import numpy as np
 
-from .config import get_config
+from src.config import get_config
 
 
 def _get_model_cfg() -> Dict:
@@ -106,16 +106,35 @@ def generate_photonic_rf(duration: float,
     beamjitter_ns = float(model_cfg.get("beamjitter_std_ns", 1.0))
     temp_rate = float(model_cfg.get("temp_drift_rate_C_per_s", 0.01))
     temp_scale = float(model_cfg.get("temp_coherence_scale_C", 5.0))
+    
+    # FMCW Parameters
+    fmcw_bw = float(model_cfg.get("fmcw_bandwidth_hz", 0.0))
+    fmcw_period = float(model_cfg.get("fmcw_chirp_period_s", 1e-3)) # Default 1ms
 
     # Laser phases (two lasers: signal + LO) using Wiener phase noise
     phi_sig = _wiener_phase_noise(linewidth, dt, N, rng)
     phi_lo = _wiener_phase_noise(linewidth, dt, N, rng)
 
-    # Optical fields (complex envelope): E(t) = A * exp(j*(omega*t + phi(t)))
-    # We keep omega large but work with difference frequency for RF after photodetection.
-    # RF beat: cos((omega_sig - omega_lo)*t + phi_sig - phi_lo)
+    # Heterodyne RF generation
+    # Stationary frequency: delta_omega
+    # Chirp: slope * t
     delta_omega = 2.0 * np.pi * lo_offset
-    rf_phase = delta_omega * t + (phi_sig - phi_lo)
+    
+    # Phase accumulation for chirp: integral of frequency
+    # freq(t) = start_freq + (BW/T) * t
+    # phase(t) = start_freq*t + 0.5 * (BW/T) * t^2
+    # We add this on top of the LO offset
+    
+    if fmcw_bw > 0 and fmcw_period > 0:
+        # Linear chirp phase
+        # We repeat the chirp every fmcw_period
+        t_mod = np.mod(t, fmcw_period)
+        slope = fmcw_bw / fmcw_period
+        chirp_phase = 2.0 * np.pi * (0.5 * slope * t_mod**2)
+    else:
+        chirp_phase = 0.0
+
+    rf_phase = delta_omega * t + chirp_phase + (phi_sig - phi_lo)
 
     base_rf = amp * np.cos(rf_phase)
 

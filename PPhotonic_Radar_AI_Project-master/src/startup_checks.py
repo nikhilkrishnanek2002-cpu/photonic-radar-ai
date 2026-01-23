@@ -4,8 +4,8 @@ import hashlib
 import platform
 from importlib import util
 
-from .config import get_config
-from .logger import log_event, init_logging
+from src.config import get_config
+from src.logger import log_event, init_logging
 
 
 def _sha256(path):

@@ -1,30 +1,19 @@
 import numpy as np
-from scipy.signal import stft
+from src.signal.transforms import compute_range_doppler_map, compute_spectrogram
 
 def extract_range_doppler(signal, n_fft=128):
     """
     Computes the Range-Doppler map using 2D FFT.
-    In a real system, this involves FFT across fast-time and slow-time.
-    Here we simulate it by reshaping the signal.
+    Delegates to src.signal.transforms.
     """
-    # Reshape signal to simulate pulses (slow-time) and samples (fast-time)
-    num_pulses = len(signal) // n_fft
-    if num_pulses == 0:
-        return np.zeros((n_fft, n_fft))
-    
-    pulses = signal[:num_pulses * n_fft].reshape(num_pulses, n_fft)
-    
-    # 2D FFT: Fast-time FFT (range) then Slow-time FFT (Doppler)
-    rd_map = np.fft.fft2(pulses, s=(n_fft, n_fft))
-    rd_map = np.fft.fftshift(rd_map)
-    return np.abs(rd_map)
+    return compute_range_doppler_map(signal, n_range=n_fft, n_doppler=n_fft)
 
 def extract_micro_doppler(signal, fs=4096, nperseg=256):
     """
     Computes Micro-Doppler spectrogram using STFT.
     """
-    f, t, Zxx = stft(signal, fs=fs, nperseg=nperseg)
-    return np.abs(Zxx)
+    _, _, spec = compute_spectrogram(signal, fs=fs, nperseg=nperseg)
+    return spec
 
 def extract_phase_statistics(signal):
     """

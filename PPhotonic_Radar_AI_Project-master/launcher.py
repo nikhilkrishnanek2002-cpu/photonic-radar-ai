@@ -55,14 +55,27 @@ def check_dependencies():
             # Some manual corrections for packages where import name != package name
             # already handled by the 'packages' dict keys, mostly.
             
-            packages_to_install = [p for p in missing]
+            packages_to_install = [p for p in missing if p != 'torch']
             
-            subprocess.check_call([sys.executable, "-m", "pip", "install"] + packages_to_install)
+            # 1. Install general packages (lightweight)
+            if packages_to_install:
+                print(f"Installing: {', '.join(packages_to_install)}")
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir"] + packages_to_install)
+            
+            # 2. Install PyTorch (CPU Version) to save disk space (avoiding 2GB+ CUDA libs)
+            if 'torch' in missing:
+                print("Installing Lightweight PyTorch (CPU) to save disk space...")
+                # We use the official PyTorch CPU wheel index
+                subprocess.check_call([
+                    sys.executable, "-m", "pip", "install", "--no-cache-dir", 
+                    "torch", "--index-url", "https://download.pytorch.org/whl/cpu"
+                ])
+                
             print("✅ Dependencies installed successfully! Restarting...")
             return True
         except Exception as e:
             print(f"❌ Auto-install failed: {e}")
-            print("Please run manually: pip install -r requirements.txt")
+            print("Try running: pip install --no-cache-dir -r requirements.txt")
             return False
             
     return True
