@@ -49,12 +49,12 @@ def get_adaptive_window(n_samples: int, method: str = 'hann', **kwargs) -> np.nd
     """
     from scipy.signal.windows import chebwin, taylor
     
-    if method == 'cheb':
-        at = kwargs.get('at', 60) # Sidelobe attenuation in dB
+    if method == 'cheb' or method == 'dolph':
+        at = kwargs.get('at', 80) # Sidelobe attenuation in dB
         return chebwin(n_samples, at=at)
     elif method == 'taylor':
         nbar = kwargs.get('nbar', 4)
-        sll = kwargs.get('sll', 35) # Sidelobe level
+        sll = kwargs.get('sll', 40) # Sidelobe level
         return taylor(n_samples, nbar=nbar, sll=sll)
     else:
         # Fallback to scipy get_window for standard types
@@ -106,13 +106,15 @@ def compute_range_doppler_map(
     matrix = matrix * win_range[np.newaxis, :]
     
     # 3. Fast-Time FFT (Range FFT) -> Axis 1
-    range_profile = np.fft.fft(matrix, n=n_fft_range, axis=1)
+    # Scale by 1/N to maintain power levels
+    range_profile = np.fft.fft(matrix, n=n_fft_range, axis=1) / samples_per_chirp
     
     # Apply Doppler Window
     range_profile = range_profile * win_doppler[:, np.newaxis]
     
     # 4. Slow-Time FFT (Doppler FFT) -> Axis 0
-    rd_complex = np.fft.fft(range_profile, n=n_fft_doppler, axis=0)
+    # Scale by 1/M to maintain power levels
+    rd_complex = np.fft.fft(range_profile, n=n_fft_doppler, axis=0) / n_chirps
     
     # 5. Shift and Magnitude
     rd_shifted = np.fft.fftshift(rd_complex, axes=0)

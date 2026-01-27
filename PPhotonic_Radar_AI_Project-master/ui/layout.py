@@ -69,13 +69,30 @@ def render_main_layout():
 
     # 5. Simulation Control
     if st.sidebar.button("INITIATE TACTICAL SWEEP", type="primary"):
-        # Convert UI targets to Simulation States
-        initial_states = [
-            TargetState(id=i+1, position_m=float(t.range_m), velocity_m_s=float(t.velocity_m_s), type=t.description.lower())
-            for i, t in enumerate(ui_targets)
-        ]
+        # Convert UI targets to Simulation States (2D Projection)
+        initial_states = []
+        for i, t in enumerate(ui_targets):
+             # Assign random azimuth for 2D simulation to scatter targets on PPI
+             angle_rad = np.random.uniform(0, 2 * np.pi)
+             px = t.range_m * np.cos(angle_rad)
+             py = t.range_m * np.sin(angle_rad)
+             # Project radial velocity to vector
+             vx = t.velocity_m_s * np.cos(angle_rad)
+             vy = t.velocity_m_s * np.sin(angle_rad)
+             
+             initial_states.append(TargetState(
+                 id=i+1, 
+                 pos_x=px, pos_y=py, 
+                 vel_x=vx, vel_y=vy, 
+                 type=t.description.lower()
+             ))
         
-        sim = SimulationOrchestrator(p_cfg.as_dict() if hasattr(p_cfg, 'as_dict') else vars(p_cfg), initial_states)
+        # Add Scanning Config
+        config_dict = p_cfg.as_dict() if hasattr(p_cfg, 'as_dict') else vars(p_cfg)
+        config_dict['rpm'] = 12.0
+        config_dict['beamwidth_deg'] = 15.0 # Wide beam for visibility
+        
+        sim = SimulationOrchestrator(config_dict, initial_states)
         
         # Reset buffers on new sweep
         if 'ppi_history' in st.session_state: del st.session_state.ppi_history
@@ -88,17 +105,26 @@ def render_main_layout():
             metrics["snr_db"] = 25.0 + np.random.uniform(-2, 2)
             
             # Update PPI
+            # Update PPI
             with ppi_placeholder.container():
                 ppi_targets = []
                 for t in frame_data["targets"]:
-                    # Try to find track for classification
+                    # Compute Polar from Cartesian
+                    px, py = t["pos_x"], t["pos_y"]
+                    rng = np.sqrt(px**2 + py**2)
+                    az = np.degrees(np.arctan2(py, px)) % 360
+                    
                     ppi_targets.append({
                         "id": t["id"],
-                        "range_m": t["position_m"],
-                        "velocity_m_s": t["velocity_m_s"],
+                        "range_m": rng,
+                        "azimuth_deg": az,
+                        "velocity_m_s": t.get("radial_velocity", 0.0), # If we added this output or just compute it
                         "class": t.get("type", "Unknown").capitalize()
                     })
-                render_ppi(ppi_targets)
+                
+                # We should also visualize the scan line
+                scan_angle = frame_data.get("scan_angle", 0)
+                render_ppi(ppi_targets, scan_angle=scan_angle)
                 
             # Update Waterfall
             with waterfall_placeholder.container():

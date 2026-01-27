@@ -58,6 +58,34 @@ def generate_clutter(n_samples: int, distribution: str = 'weibull', scenario: st
     phase = np.random.uniform(0, 2*np.pi, n_samples)
     return mag * np.exp(1j * phase)
 
+def apply_clutter_map(rd_map: np.ndarray, scenario: str = 'ground') -> np.ndarray:
+    """
+    Applies spatial clutter to a Range-Doppler map.
+    
+    Scenarios:
+    - 'ground': Heavy clutter at low ranges (indices 0-20), near zero Doppler.
+    - 'weather': Broad clutter region (rain/clouds) at mid ranges.
+    """
+    rows, cols = rd_map.shape
+    clutter_overlay = np.zeros_like(rd_map)
+    
+    if scenario == 'ground':
+        # Clutter at near ranges (cols) and zero-doppler (rows near middle)
+        center_row = rows // 2
+        clutter_rows = slice(center_row - 5, center_row + 5)
+        clutter_cols = slice(0, 20)
+        
+        # Non-Gaussian magnitude (Weibull)
+        noise_mag = generate_clutter(10 * 20, distribution='weibull', shape=1.2, scale=5.0)
+        clutter_overlay[clutter_rows, clutter_cols] = np.abs(noise_mag.reshape(10, 20))
+        
+    elif scenario == 'weather':
+        # Large patch of clutter
+        noise_mag = generate_clutter(rows * (cols//4), distribution='k', shape=2.0)
+        clutter_overlay[:, cols//2 : cols//2 + cols//4] = np.abs(noise_mag.reshape(rows, cols//4)) * 2.0
+        
+    return rd_map + clutter_overlay
+
 def add_interference(signal: np.ndarray, interference_type: str = 'narrowband', **kwargs) -> np.ndarray:
     """
     Simulates electronic interference or jamming.

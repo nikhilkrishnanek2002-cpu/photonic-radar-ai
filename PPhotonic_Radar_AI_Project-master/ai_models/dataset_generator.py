@@ -45,37 +45,60 @@ class RadarDatasetGenerator:
         
         elif target_class == "bird":
             # Biological modulation: Low frequency, erratic amplitude
-            v = np.random.uniform(2, 12)
-            flapping_freq = np.random.uniform(2, 8)
+            v = np.random.uniform(5, 15)
+            flapping_freq = np.random.uniform(3, 10)
             carrier = np.exp(1j * 2 * np.pi * v * t)
-            # Amplitude modulation for flapping
-            am = 0.5 * (1 + 0.4 * np.sin(2 * np.pi * flapping_freq * t))
+            # Amplitude modulation for wing flapping
+            am = 0.5 * (1 + 0.6 * np.sin(2 * np.pi * flapping_freq * t))
             signal = carrier * am
             
         else:
             params = {
-                "drone": {"v": 15, "rcs": -15, "rotors": 4, "rpm": 12000},
-                "aircraft": {"v": 240, "rcs": 25, "rotors": 0},
-                "missile": {"v": 950, "rcs": 2, "rotors": 0}
+                "drone": {"v": 15, "rcs": -15, "rotors": 4, "rpm": 15000, "blade_len": 0.15},
+                "aircraft": {"v": 250, "rcs": 25, "jem_blades": 32, "jem_rpm": 8000},
+                "missile": {"v_start": 400, "accel": 150, "rcs": 5}
             }[target_class]
             
-            # Base Doppler
-            v_actual = params["v"] + np.random.normal(0, 2)
-            carrier = np.exp(1j * 2 * np.pi * v_actual * t)
-            
-            # Micro-Doppler (Rotor Physics)
-            if params["rotors"] > 0:
+            if target_class == "drone":
+                # Multi-rotor simulation with multiple blade harmonics
+                v_actual = params["v"] + np.random.normal(0, 3)
+                carrier = np.exp(1j * 2 * np.pi * v_actual * t)
+                
                 md_signal = np.zeros(n_samples, dtype=complex)
                 for _ in range(params["rotors"]):
-                    l_blade = np.random.uniform(0.1, 0.2) # meters
-                    rpm = params["rpm"] + np.random.normal(0, 500)
-                    fm = rpm / 60.0
-                    # Phase modulation from rotatory motion
-                    beta = (2 * np.pi * l_blade) / 0.03 # 3cm wavelength approximation
+                    rpm = params["rpm"] + np.random.normal(0, 1000)
+                    fm = rpm / 60.0 # modulation freq
+                    # Phase modulation depth proportional to blade length/wavelength
+                    # lambda = 3cm @ 10GHz
+                    beta = (2 * np.pi * params["blade_len"]) / 0.03
+                    # Drone signature often has multiple harmonics (blade edges)
                     md_signal += np.exp(1j * beta * np.sin(2 * np.pi * fm * t))
-                carrier *= (md_signal / params["rotors"])
-            
-            signal = carrier
+                    md_signal += 0.3 * np.exp(1j * 2 * beta * np.sin(2 * np.pi * fm * t))
+                
+                signal = carrier * (md_signal / params["rotors"])
+                
+            elif target_class == "aircraft":
+                # Jet Engine Modulation (JEM)
+                # JEM is the chopping of the radar signal by turbine blades
+                v_actual = params["v"] + np.random.normal(0, 5)
+                carrier = np.exp(1j * 2 * np.pi * v_actual * t)
+                
+                # JEM frequency = N_blades * RPM / 60
+                jem_freq = params["jem_blades"] * params["jem_rpm"] / 60.0
+                # JEM typically appears as sidebands in the spectrum
+                jem_modulation = 1 + 0.2 * np.cos(2 * np.pi * jem_freq * t)
+                signal = carrier * jem_modulation
+                
+            elif target_class == "missile":
+                # High speed with linear acceleration (Doppler drift)
+                v0 = params["v_start"] + np.random.normal(0, 50)
+                a = params["accel"] + np.random.normal(0, 20)
+                # Phase is integral of freq: phi = 2pi * integral( v/lambda dt )
+                # lambda = 0.03m
+                # v(t) = v0 + a*t
+                # phi(t) = 2pi * (v0*t + 0.5*a*t^2) / lambda
+                phase = (2 * np.pi / 0.03) * (v0 * t + 0.5 * a * t**2)
+                signal = np.exp(1j * phase)
 
         # 2. Photonic Noise Integration (WDM/MDM Crosstalk simulation)
         # We simulate the effects of optical nonlinearities and crosstalk
@@ -93,15 +116,24 @@ class RadarDatasetGenerator:
         # Spectrogram (Temporal Frequency)
         spec = compute_spectrogram(signal, fs=fs, nperseg=256, noverlap=128)
         
-        # Raw IQ Sequence (sub-sampled for time-series branch)
-        ts_points = 1000
-        time_series = np.concatenate([np.real(signal[:ts_points]), np.imag(signal[:ts_points])])
+        # 4. Metadata Enrichment (For XAI and tracking validation)
+        metadata = {
+            "class": target_class,
+            "snr_db": snr,
+            "kinematics": params if target_class not in ["noise", "bird"] else {},
+            "dt": duration
+        }
+        
+        # Sub-sampled IQ for time-series branch
+        ts_points = 512
+        time_series = np.stack([np.real(signal[:ts_points]), np.imag(signal[:ts_points])])
         
         return {
             "rd_map": rd_map,
             "spectrogram": spec,
             "time_series": time_series,
-            "label": self.classes.index(target_class)
+            "label": self.classes.index(target_class),
+            "metadata": metadata
         }
 
     def generate_batch(self, samples_per_class: int = 50) -> Dict[str, torch.Tensor]:

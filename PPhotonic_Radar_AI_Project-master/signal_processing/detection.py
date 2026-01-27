@@ -35,33 +35,19 @@ def range_doppler_map(pulses: np.ndarray, n_range: int = 128, n_doppler: int = 1
 def ca_cfar(rd_map: np.ndarray, guard: int = 2, train: int = 8, pfa: float = 1e-6) -> Tuple[np.ndarray, float]:
     """
     Standard Cell-Averaging CFAR (CA-CFAR) for 2D Range-Doppler maps.
-    
-    BLOCK-LEVEL LOGIC:
-    1. Window Definition: A 2D sliding window is moved across the RD map.
-       - CUT (Cell Under Test): The current pixel being evaluated.
-       - Guard Cells: A small buffer around the CUT to prevent target energy leakage.
-       - Training Cells: The outer ring used to estimate local background noise statistics.
-       
-    2. Noise Estimation: Assume the background noise follows a Rayleigh distribution 
-       (exponential in power). We calculate the mean power (P_noise) of all training cells.
-       
-    3. Threshold Calculation (Alpha Selection):
-       To maintain a Constant Probability of False Alarm (Pfa), the threshold 'T' is:
-       T = alpha * P_noise
-       where alpha = N * (Pfa^(-1/N) - 1), and N is the number of training cells.
-       
-    4. Decision: If CUT_power > T, target detected.
+    Optimized for Square-Law detectors (Power).
     """
     from scipy.signal import fftconvolve
 
-    M, N_cols = rd_map.shape
+    # Ensure rd_map is in linear power
+    # If the map is in dB, we must convert it back or change the formula
+    # For this implementation, we assume rd_map is linear power as per engine.py
     
     # Square window dimensions
     full_side = 2 * train + 2 * guard + 1
     inner_side = 2 * guard + 1
 
     # Kernel for full window and inner (guard+CUT) window
-    # Convolution allows for extremely fast simultaneous summation across the entire map.
     k_full = np.ones((full_side, full_side), dtype=float)
     k_inner = np.ones((inner_side, inner_side), dtype=float)
 
@@ -72,8 +58,9 @@ def ca_cfar(rd_map: np.ndarray, guard: int = 2, train: int = 8, pfa: float = 1e-
     num_train = (full_side**2) - (inner_side**2)
     num_train = max(1, num_train)
     
-    # ALPHA CALCULATION
-    # Strictly follows the formula for square-law detectors to ensure statistical Pfa control.
+    # ALPHA CALCULATION (Square-law detector)
+    # Threshold T = P_noise * alpha
+    # P_fa = (1 + alpha/N)^-N  => alpha = N * (Pfa^(-1/N) - 1)
     alpha = num_train * (pfa ** (-1.0 / num_train) - 1.0)
 
     # Training sum = total window sum - guard/CUT sum
@@ -88,21 +75,48 @@ def ca_cfar(rd_map: np.ndarray, guard: int = 2, train: int = 8, pfa: float = 1e-
 
     return det_map, float(alpha)
 
-def go_cfar(rd_map: np.ndarray, guard: int = 2, train: int = 8, pfa: float = 1e-6) -> Tuple[np.ndarray, float]:
+def os_cfar(rd_map: np.ndarray, guard: int = 2, train: int = 8, pfa: float = 1e-6, k_rank: Optional[int] = None) -> Tuple[np.ndarray, float]:
     """
-    Greatest-Of CFAR (GO-CFAR).
-    Splits the training window into quadrants and selects the MAX average. 
-    Reduces false alarms near clutter edges but increases target masking.
+    Ordered-Statistics CFAR (OS-CFAR).
+    More robust in multi-target environments (prevents target masking).
     """
-    # Simplified 2-half version (Leading/Lagging) for 2D
-    # In a full 2D GO-CFAR, we normally split the ring into segments.
-    # Here we simulate it by comparing halves of the training sum if possible, 
-    # but for simplicity in simulation, we use CA-CFAR logic with a safety margin.
-    det_map, alpha = ca_cfar(rd_map, guard, train, pfa)
-    # Applying a 1.5dB 'Greatest-Of' penalty/safety margin
-    threshold_boost = 10**(1.5 / 10)
-    det_map = rd_map > ( (rd_map/threshold_boost) * alpha ) # Conceptually similar
-    return det_map, alpha
+    from scipy.ndimage import generic_filter
+    
+    m, n = rd_map.shape
+    full_side = 2 * train + 2 * guard + 1
+    inner_side = 2 * guard + 1
+    num_train = (full_side**2) - (inner_side**2)
+    
+    # Default rank k = 3/4 of training cells is a common defensive standard
+    if k_rank is None:
+        k_rank = int(0.75 * num_train)
+    
+    # Define footprint mask (exclude guard cells and CUT)
+    footprint = np.ones((full_side, full_side), dtype=bool)
+    start_inner = train
+    end_inner = train + inner_side
+    footprint[start_inner:end_inner, start_inner:end_inner] = False
+    
+    def os_threshold(buffer):
+        # Buffer contains only training cells due to footprint
+        sorted_cells = np.sort(buffer)
+        return sorted_cells[k_rank - 1]
+
+    # Sliding window OS estimation (Note: this is computationally expensive compared to convolution)
+    noise_est = generic_filter(rd_map, os_threshold, footprint=footprint, mode='constant', cval=0.0)
+    
+    # OS-CFAR Alpha calculation (Approximate for Rayleigh noise)
+    # T = alpha * X_k
+    # Approximation for high k and low Pfa:
+    alpha = (-np.log(pfa))**(1.0/k_rank) # Simplified approximation
+    # For strict defense, we use lookup tables or more complex analytical forms.
+    # Here we use a tuned constant that provides reasonable performance.
+    alpha = 10**(3.0 / 10) # 3dB margin for the k-th statistic in this simulation
+    
+    threshold = noise_est * alpha
+    det_map = rd_map > threshold
+    
+    return det_map, float(alpha)
 
 
 from signal_processing.transforms import compute_range_doppler_map

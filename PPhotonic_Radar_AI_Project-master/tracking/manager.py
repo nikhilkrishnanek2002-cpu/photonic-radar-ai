@@ -25,8 +25,9 @@ class TrackState(Enum):
     DELETED = 4
 
 class RadarTrack:
-    def __init__(self, track_id: int, initial_meas: np.ndarray, dt: float):
+    def __init__(self, track_id: int, initial_meas: np.ndarray, dt: float, max_coast: int = 20):
         self.track_id = track_id
+        self.max_coast = max_coast
         self.kf = KalmanFilter(dt=dt)
         # Initialize state: [range, velocity, 0]
         self.kf.x = np.array([initial_meas[0], initial_meas[1], 0.0])
@@ -70,7 +71,7 @@ class RadarTrack:
         # Deletion logic
         if self.state == TrackState.PROVISIONAL and self.consecutive_misses >= 2:
             self.state = TrackState.DELETED
-        elif self.state == TrackState.COASTING and self.consecutive_misses >= 10:
+        elif self.state == TrackState.COASTING and self.consecutive_misses >= self.max_coast:
             self.state = TrackState.DELETED
 
     @property
@@ -78,17 +79,18 @@ class RadarTrack:
         return self.state != TrackState.DELETED
 
 class TrackManager:
-    def __init__(self, dt: float, association_gate: float = 3.5):
+    def __init__(self, dt: float, association_gate: float = 3.5, max_coast_frames: int = 500):
         """
         Args:
             dt: Sampling time.
             association_gate: Mahalanobis distance threshold (Standard deviations).
-                              3.5 corresponds to ~99% confidence for 2D.
+            max_coast_frames: Number of frames to hold track without detection.
         """
         self.dt = dt
         self.tracks: List[RadarTrack] = []
         self.next_id = 1
         self.association_gate = association_gate 
+        self.max_coast_frames = max_coast_frames
 
     def update(self, detections: List[Tuple[float, float]]) -> List[Dict]:
         """
@@ -134,7 +136,7 @@ class TrackManager:
             
         # 5. Handle new detections (Provisional initiation)
         for det_idx in unassigned_detections:
-            new_track = RadarTrack(self.next_id, np.array(detections[det_idx]), self.dt)
+            new_track = RadarTrack(self.next_id, np.array(detections[det_idx]), self.dt, self.max_coast_frames)
             self.tracks.append(new_track)
             self.next_id += 1
             

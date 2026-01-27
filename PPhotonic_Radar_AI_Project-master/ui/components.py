@@ -34,9 +34,9 @@ def render_metrics(metrics: dict):
     c3.metric("VELOCITY RES", f"{metrics.get('vel_res', 0):.2f} m/s")
     c4.metric("AI CONFIDENCE", f"{metrics.get('ai_conf', 0):.1%}")
 
-def render_ppi(targets: List[Dict], history_size: int = 5):
+def render_ppi(targets: List[Dict], history_size: int = 5, scan_angle: float = 0.0):
     """
-    Renders a Plan Position Indicator (PPI) radar display with track history.
+    Renders a Plan Position Indicator (PPI) radar display with track history and scan beam.
     """
     st.markdown("### ⏺️ PPI RADAR DISPLAY")
     
@@ -45,11 +45,22 @@ def render_ppi(targets: List[Dict], history_size: int = 5):
 
     fig = go.Figure()
     
+    # Draw Scan Beam (Line + Sector)
+    fig.add_trace(go.Scatterpolar(
+        r=[0, 3000],
+        theta=[scan_angle, scan_angle],
+        mode='lines',
+        line=dict(color='rgba(77, 250, 77, 0.8)', width=2),
+        name='Scan Beam',
+        hoverinfo='skip',
+        showlegend=False
+    ))
+
     for t in targets:
         tid = t['id']
         r_now = t['range_m']
-        # In this simulation, bearing is derived from ID to stay consistent
-        theta_now = (tid * 45) % 360 
+        # Use provided azimuth or default
+        theta_now = t.get('azimuth_deg', (tid * 45) % 360) 
         
         if tid not in st.session_state.ppi_history:
             st.session_state.ppi_history[tid] = []
@@ -86,7 +97,7 @@ def render_ppi(targets: List[Dict], history_size: int = 5):
         polar=dict(
             bgcolor="#050805",
             radialaxis=dict(visible=True, range=[0, 3000], color="#1a331a", gridcolor="#1a331a"),
-            angularaxis=dict(color="#1a331a", gridcolor="#1a331a")
+            angularaxis=dict(color="#1a331a", gridcolor="#1a331a", rotation=90, direction="clockwise")
         ),
         showlegend=False,
         margin=dict(l=20, r=20, t=20, b=20),

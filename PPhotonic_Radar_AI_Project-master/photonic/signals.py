@@ -26,8 +26,10 @@ class PhotonicConfig:
     f_start: float = 8e9       # Start Frequency (Hz) e.g., 8 GHz
     bandwidth: float = 4e9     # Chirp Bandwidth (Hz) e.g., 4 GHz
     laser_linewidth: float = 100e3  # Laser Linewidth (Hz) - e.g., 100 kHz
-    optical_power_dbm: float = 10.0 # Optical Power (dBm)
+    optical_power_dbm: float = 10.0 # Optical Power per line(dBm)
     photodetector_responsivity: float = 0.8 # A/W
+    n_comb_lines: int = 1           # Number of coherent lines (OFC mode)
+    comb_spacing_hz: float = 10e9   # Spacing between comb lines
 
 def generate_phase_noise(n_samples: int, fs: float, linewidth: float, rng: np.random.Generator) -> np.ndarray:
     """
@@ -45,6 +47,25 @@ def generate_phase_noise(n_samples: int, fs: float, linewidth: float, rng: np.ra
     # Cumulative sum to simulate Random Walk (Wiener Process)
     return np.cumsum(steps)
 
+def generate_ofc_signal(config: PhotonicConfig, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """
+    Simulates an Optical Frequency Comb (OFC) signal.
+    Models multiple phase-locked optical carriers.
+    """
+    ofc_field = np.zeros(len(t), dtype=complex)
+    p_watts = 10 ** ((config.optical_power_dbm - 30) / 10)
+    amplitude = np.sqrt(p_watts)
+    
+    # Common phase noise for all lines (Phase coherence)
+    phi_common = generate_phase_noise(len(t), config.fs, config.laser_linewidth, rng)
+    
+    for i in range(config.n_comb_lines):
+        f_offset = i * config.comb_spacing_hz
+        # Each line: E_i = A * exp(j * (2*pi*f_i*t + phi_common))
+        ofc_field += amplitude * np.exp(1j * (2 * np.pi * f_offset * t + phi_common))
+        
+    return ofc_field
+
 def generate_photonic_signal(config: PhotonicConfig, seed: Optional[int] = None) -> Tuple[np.ndarray, np.ndarray]:
     """
     Simulates the end-to-end photonic radar signal generation.
@@ -58,42 +79,32 @@ def generate_photonic_signal(config: PhotonicConfig, seed: Optional[int] = None)
     t = np.arange(N) / config.fs
     
     # 1. Parameter Setup
-    # LO Frequency (Virtual Optical Offset)
-    # We model everything in baseband equivalent relative to the Optical Carrier (193 THz).
-    # Master Laser Freq: f_opt + f_RF(t)
-    # Local Oscillator: f_opt
-    
-    # Convert dBm to Watts
     p_watts = 10 ** ((config.optical_power_dbm - 30) / 10)
-    amplitude = np.sqrt(p_watts)
     
-    # 2. Generate Phase Noise
-    # Independent phase noise for Master Laser (Tx) and LO
-    phi_tx = generate_phase_noise(N, config.fs, config.laser_linewidth, rng)
+    # 2. Generate Phase Noise and Modulation
+    # If comb lines > 1, Tx is an OFC
+    if config.n_comb_lines > 1:
+        e_tx = generate_ofc_signal(config, t, rng)
+        # Apply FMCW modulation to the entire comb? 
+        # In a real system, the whole comb can be modulated.
+        slope = config.bandwidth / config.duration
+        phase_modulation = 2 * np.pi * (config.f_start * t + 0.5 * slope * t**2)
+        e_tx *= np.exp(1j * phase_modulation)
+    else:
+        phi_tx = generate_phase_noise(N, config.fs, config.laser_linewidth, rng)
+        slope = config.bandwidth / config.duration
+        phase_modulation = 2 * np.pi * (config.f_start * t + 0.5 * slope * t**2)
+        e_tx = np.sqrt(p_watts) * np.exp(1j * (phase_modulation + phi_tx))
+        
+    # 3. Local Oscillator (LO)
+    # LO typically doesn't have comb lines unless it's a dual-comb system
     phi_lo = generate_phase_noise(N, config.fs, config.laser_linewidth, rng)
+    e_lo = np.sqrt(p_watts) * np.exp(1j * phi_lo)
     
-    # 3. FMCW Modulation (Linear Frequency Sweep)
-    # f_inst(t) = f_start + (B/T) * t
-    slope = config.bandwidth / config.duration
-    
-    # Phase is integral of frequency: phi = 2*pi * (f_start*t + 0.5*slope*t^2)
-    phase_modulation = 2 * np.pi * (config.f_start * t + 0.5 * slope * t**2)
-    
-    # 4. Total Optical Phase
-    # Field Tx: E_tx = A * exp(j * (phase_mod + phi_tx))
-    # Field LO: E_lo = A * exp(j * (phi_lo))  (Assume LO is at frequency 0 relative to carrier)
-    
-    # 5. Photodetection (Square Law Mixing)
+    # 4. Photodetection (Square Law Mixing)
     # I_pd = R * |E_tx + E_lo|^2
-    # Expanding: |A|^2 + |A|^2 + 2*A^2 * Re(E_tx * E_lo*)
-    # The AC term (RF signal) is the cross term.
-    
-    # RF Component Phase = (phase_mod + phi_tx) - (phi_lo)
-    rf_total_phase = phase_modulation + (phi_tx - phi_lo)
-    
-    # RF Current
-    # i_rf(t) = 2 * R * P * cos(theta(t))
-    i_rf = 2 * config.photodetector_responsivity * p_watts * np.cos(rf_total_phase)
+    # The AC term is 2 * R * Re(E_tx * E_lo*)
+    i_rf = 2 * config.photodetector_responsivity * np.real(e_tx * np.conj(e_lo))
     
     return t, i_rf
 

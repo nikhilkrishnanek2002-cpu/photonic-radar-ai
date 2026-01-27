@@ -25,46 +25,50 @@ class RadarDSPEngine:
         self.n_fft_doppler = config.get('n_fft_doppler', 128)
         self.window_type = config.get('window_type', 'taylor')
 
-    def process_frame(self, pulse_matrix: np.ndarray) -> np.ndarray:
+    def process_frame(self, pulse_matrix: np.ndarray, accumulate: bool = True) -> np.ndarray:
         """
-        Executes the full Range-Doppler transformation.
+        Executes the full Range-Doppler transformation with multi-frame integration.
         
         pulse_matrix: shape (num_pulses, samples_per_pulse)
+        accumulate: If True, uses NCI (Temporal Integration) to improve SNR.
         """
+        from signal_processing.integration import FrameAccumulator
+        
+        if not hasattr(self, 'accumulator'):
+            self.accumulator = FrameAccumulator(capacity=self.config.get('nci_frames', 5))
+            
         num_pulses, samples = pulse_matrix.shape
         
-        # 1. Range Processing (Fast-Time)
-        # Apply window along the fast-time dimension
-        windowed_pulses = np.apply_along_axis(
-            lambda x: apply_window(x, self.window_type), 
-            axis=1, 
-            arr=pulse_matrix
-        )
+        # 1. Fast-Time (Range) Processing
+        # Apply optimal window (Dolph-Chebyshev/Taylor)
+        win_fast = apply_window(np.ones(samples), method=self.window_type)
+        windowed_pulses = pulse_matrix * win_fast[np.newaxis, :]
         
-        # Fast FFT along rows
-        range_fft = np.fft.fft(windowed_pulses, n=self.n_fft_range, axis=1)
+        # FFT and Power scaling (1/N)
+        range_fft = np.fft.fft(windowed_pulses, n=self.n_fft_range, axis=1) / samples
         
-        # 2. Doppler Processing (Slow-Time)
-        # Apply window along the slow-time dimension
-        windowed_range = np.apply_along_axis(
-            lambda x: apply_window(x, self.window_type),
-            axis=0,
-            arr=range_fft
-        )
+        # 2. Slow-Time (Doppler) Processing
+        # Apply slow-time windowing
+        win_slow = apply_window(np.ones(num_pulses), method=self.window_type)
+        windowed_doppler = range_fft * win_slow[:, np.newaxis]
         
-        # FFT along columns
-        rd_complex = np.fft.fft(windowed_range, n=self.n_fft_doppler, axis=0)
+        # FFT and Power scaling (1/M)
+        rd_complex = np.fft.fft(windowed_doppler, n=self.n_fft_doppler, axis=0) / num_pulses
         
         # Shift zero frequency to center
         rd_shifted = np.fft.fftshift(rd_complex, axes=0)
         
-        # 3. Power Scaling
-        # We return the magnitude magnitude squared (Power)
-        rd_power = np.abs(rd_shifted)**2
+        # 3. Power Extraction (Linear domain)
+        rd_linear_power = np.abs(rd_shifted)**2
         
-        # 4. Log Transformation (dB)
-        # 10 * log10(Power)
-        rd_db = 10 * np.log10(rd_power + 1e-12)
+        # 4. Multi-Frame Integration (NCI)
+        if accumulate:
+            rd_final_power = self.accumulator.add_frame(rd_linear_power)
+        else:
+            rd_final_power = rd_linear_power
+            
+        # 5. Log Transformation (dB)
+        rd_db = 10 * np.log10(rd_final_power + 1e-12)
         
         return rd_db
 
