@@ -8,14 +8,16 @@ Coordinates:
 2. Photonic signal generation.
 3. Signal processing (Range-Doppler).
 4. AI Classification.
-5. Track Management (Kalman).
+5. Tactical Tracking.
+6. Intelligence Publishing (defense_core integration).
 
-Author: Simulation Engineer
+Author: Nikhil Krishna
 """
 
 import time
 import numpy as np
-from typing import List, Dict
+import math
+from typing import List, Dict, Optional
 from simulation_engine.physics import TargetState, KinematicEngine
 from simulation_engine.performance import PerformanceMonitor
 from photonic.signals import generate_synthetic_photonic_signal
@@ -24,11 +26,30 @@ from signal_processing.detection import ca_cfar_detector, cluster_and_centroid_d
 from ai_models.architectures import TacticalHybridClassifier, initialize_tactical_model
 from tracking.manager import TacticalTrackManager
 from simulation_engine.evaluation import EvaluationManager
+from interfaces.message_schema import (
+    Track, ThreatAssessment, SceneContext, TacticalPictureMessage,
+    ThreatClass, TargetType, EngagementRecommendation, SceneType
+)
+from interfaces.publisher import IntelligencePublisher, NullPublisher
+
+# Defense Core Integration
+from defense_core import (
+    get_defense_bus,
+    RadarIntelligencePacket,
+    Track as DefenseTrack,
+    ThreatAssessment as DefenseThreatAssessment,
+    SceneContext as DefenseSceneContext
+)
+
+
 import torch
 import torch.nn.functional as F
 
 class SimulationOrchestrator:
-    def __init__(self, radar_config: Dict, initial_targets: List[TargetState]):
+    def __init__(self, radar_config: Dict, initial_targets: List[TargetState] = [], event_bus=None):
+        """
+        Initialize simulation orchestrator using config dict.
+        """
         self.config = radar_config
         self.dt = radar_config.get('frame_dt', 0.1)
         self.physics = KinematicEngine(self.dt)
@@ -53,6 +74,52 @@ class SimulationOrchestrator:
         self.scan_angle_deg = 0.0
         self.rpm = radar_config.get('rpm', 12.0) # 12 RPM default
         self.beamwidth_deg = radar_config.get('beamwidth_deg', 5.0)
+        
+        # Intelligence Export (Legacy - file-based)
+        self.sensor_id = radar_config.get('sensor_id', 'PHOTONIC_RADAR_01')
+        enable_export = radar_config.get('enable_intelligence_export', True)
+        export_dir = radar_config.get('intelligence_export_dir', './intelligence_export')
+        
+        if enable_export:
+            self.intelligence_publisher = IntelligencePublisher(
+                sensor_id=self.sensor_id,
+                enable_file_export=True,
+                export_directory=export_dir
+            )
+            self.intelligence_publisher.start()
+        else:
+            self.intelligence_publisher = NullPublisher()
+        
+        # Defense Core Integration (Event Bus)
+        self.enable_defense_core = radar_config.get('enable_defense_core', True)
+        self.debug_packets = radar_config.get('debug_packets', False)
+        self.packets_sent = 0
+        self.packets_dropped = 0
+        
+        if self.enable_defense_core:
+            self.defense_bus = event_bus if event_bus else get_defense_bus()
+            print(f"[DEFENSE_CORE] Event bus initialized for sensor: {self.sensor_id}")
+            if self.debug_packets:
+                print(f"[DEFENSE_CORE] Debug mode ENABLED - packets will be printed")
+        else:
+            self.defense_bus = None
+        
+        # EW Degradation Model
+        self.enable_ew_effects = radar_config.get('enable_ew_effects', True)
+        self.ew_log_before_after = radar_config.get('ew_log_before_after', True)
+        
+        if self.enable_ew_effects:
+            from simulation_engine.ew_degradation import EWDegradationModel
+            self.ew_degradation = EWDegradationModel(
+                max_snr_degradation_db=radar_config.get('ew_max_snr_degradation_db', 20.0),
+                max_quality_degradation=radar_config.get('ew_max_quality_degradation', 0.5),
+                false_track_probability=radar_config.get('ew_false_track_probability', 0.3)
+            )
+            self.last_ew_packet = None
+            print(f"[EW-EFFECTS] EW degradation model ENABLED")
+        else:
+            self.ew_degradation = None
+            print(f"[EW-EFFECTS] EW degradation model DISABLED")
 
     def _prepare_spectrogram(self, rd_map: np.ndarray) -> torch.Tensor:
         """Prepares RD map for CNN input (Reset to 128x128)."""
@@ -184,6 +251,42 @@ class SimulationOrchestrator:
             
         self.perf.end_phase("dsp")
         
+        # 3.5 EW Effects Application
+        # DEBUG: Check flags
+        if self.frame_count % 50 == 0:
+            print(f"DEBUG: EW Flags: enable={self.enable_ew_effects}, deg={self.ew_degradation is not None}, bus={self.defense_bus is not None}")
+
+        if self.enable_ew_effects and self.ew_degradation and self.defense_bus:
+            # Poll for EW attack packets (non-blocking)
+            ew_packet = self.defense_bus.receive_ew_feedback(timeout=0.001)
+            
+            if ew_packet:
+                self.last_ew_packet = ew_packet
+                if self.frame_count % 10 == 0:
+                    print(f"[EW-RX] Frame {self.frame_count}: Received EW packet with "
+                          f"{len(ew_packet.active_countermeasures)} countermeasures")
+            
+            # Apply jamming if we have an active packet
+            if self.last_ew_packet and len(self.last_ew_packet.active_countermeasures) > 0:
+                # Reset metrics for this frame
+                self.ew_degradation.reset_metrics()
+                
+                # Capture BEFORE metrics
+                before_metrics = {
+                    'num_detections': len(detections),
+                    'mean_snr_db': float(np.mean(rd_power)) if len(rd_power) > 0 else 0.0
+                }
+                
+                # Apply noise jamming to RD map
+                rd_power = self.ew_degradation.apply_jamming(
+                    rd_power,
+                    self.last_ew_packet.active_countermeasures
+                )
+                
+                # Re-run detection on jammed RD map
+                det_map, _ = ca_cfar_detector(rd_power, power_floor=0.005)
+                detections = cluster_and_centroid_detections(det_map, rd_power)
+        
         # 4. AI & Tracking
         self.perf.start_phase("ai_tracking")
         
@@ -245,7 +348,56 @@ class SimulationOrchestrator:
 
         self.perf.end_phase("ai_tracking")
         
-        # 5. Evaluation (Offline/Online Analysis)
+        # 4.5 EW Track Degradation & Logging
+        if self.enable_ew_effects and self.ew_degradation and self.last_ew_packet:
+            if len(self.last_ew_packet.active_countermeasures) > 0:
+                # Capture BEFORE track metrics
+                before_track_metrics = {
+                    'num_tracks': len(tracks),
+                    'mean_quality': float(np.mean([t.get('quality', 1.0) for t in tracks])) if tracks else 0.0
+                }
+                before_track_metrics.update(before_metrics)  # Add detection/SNR metrics
+                
+                # Apply track quality degradation
+                tracks = self.ew_degradation.degrade_tracks(
+                    tracks,
+                    self.last_ew_packet.active_countermeasures
+                )
+                
+                # Inject false tracks from deception jamming
+                tracks = self.ew_degradation.inject_false_tracks(
+                    tracks,
+                    self.last_ew_packet.active_countermeasures,
+                    self.frame_count * self.dt
+                )
+                
+                # Apply range/velocity drift
+                tracks = self.ew_degradation.apply_drift_to_tracks(
+                    tracks,
+                    self.last_ew_packet.active_countermeasures
+                )
+                
+                # Capture AFTER track metrics
+                after_track_metrics = {
+                    'num_tracks': len(tracks),
+                    'mean_quality': float(np.mean([t.get('quality', 1.0) for t in tracks])) if tracks else 0.0,
+                    'num_false_tracks': sum(1 for t in tracks if t.get('is_false_track', False)),
+                    'snr_reduction_db': self.ew_degradation.metrics.snr_reduction_db
+                }
+                
+                # Log before/after comparison
+                if self.ew_log_before_after:
+                    self.ew_degradation.log_before_after_metrics(
+                        before_track_metrics,
+                        after_track_metrics,
+                        self.frame_count
+                    )
+        
+        # 5. Intelligence Export (Non-blocking)
+        # Export processed intelligence at every tick
+        self._export_intelligence(tracks, rd_power, len(detections))
+        
+        # 6. Evaluation (Offline/Online Analysis)
         # Convert tracks to dict format for evaluator
         track_dicts = []
         for tr in tracks:
@@ -265,6 +417,21 @@ class SimulationOrchestrator:
         self.perf.end_phase("total")
         self.frame_count += 1
         
+        # Calculate Telemetry Metrics
+        # Peak Signal Power
+        peak_power = float(np.max(rd_power)) if rd_power.size > 0 else 0.0
+        
+        # Mean SNR (Signal to Noise Ratio)
+        # Assuming noise floor is roughly the mean of the lower 50% of values (heuristic)
+        if rd_power.size > 0:
+            sorted_power = np.sort(rd_power.flatten())
+            noise_floor = np.mean(sorted_power[:int(len(sorted_power)*0.5)])
+            signal_power = np.mean(sorted_power[int(len(sorted_power)*0.95):]) # Top 5%
+            snr_linear = signal_power / (noise_floor + 1e-10)
+            mean_snr_db = 10 * np.log10(snr_linear)
+        else:
+            mean_snr_db = 0.0
+            
         return {
             "frame": self.frame_count,
             "timestamp": time.time(),
@@ -274,7 +441,12 @@ class SimulationOrchestrator:
             "rd_map": rd_map,
             "tracks": tracks,
             "metrics": self.perf.get_metrics(),
-            "evaluation": self.eval_manager.get_summary()
+            "evaluation": self.eval_manager.get_summary(),
+            "telemetry": {
+                "peak_signal_power": peak_power,
+                "mean_snr_db": mean_snr_db,
+                "track_confidence": float(np.mean([t.get('confidence', 0.0) for t in tracks])) if tracks else 0.0
+            }
         }
 
     def run_loop(self, max_frames: int = 100):
@@ -298,3 +470,281 @@ class SimulationOrchestrator:
 
     def stop(self):
         self.is_running = False
+        # Stop intelligence publisher gracefully
+        if hasattr(self, 'intelligence_publisher'):
+            self.intelligence_publisher.stop()
+    
+    def _export_intelligence(self, tracks: List[Dict], rd_power: np.ndarray, num_detections: int):
+        """
+        Export radar intelligence as tactical picture message.
+        
+        This method never blocks radar processing - messages are queued
+        and exported by background thread.
+        
+        Publishes to:
+        1. File-based intelligence publisher (legacy)
+        2. Defense core event bus (new)
+        """
+        try:
+            # ================================================================
+            # 1. Convert tracks to defense_core schema format
+            # ================================================================
+            defense_tracks = []
+            defense_threats = []
+            
+            for tr in tracks:
+                # Create defense_core Track
+                defense_track = DefenseTrack(
+                    track_id=tr['id'],
+                    range_m=float(tr['estimated_range_m']),
+                    azimuth_deg=self.scan_angle_deg,
+                    radial_velocity_m_s=float(tr['estimated_velocity_ms']),
+                    track_quality=float(tr.get('stability', 0.5)),
+                    position_uncertainty_m=10.0 * (1.0 - float(tr.get('stability', 0.5))),
+                    velocity_uncertainty_m_s=5.0 * (1.0 - float(tr.get('stability', 0.5))),
+                    track_age_frames=int(tr.get('age', 0)),
+                    last_update_timestamp=time.time()
+                )
+                defense_tracks.append(defense_track)
+                
+                # Create defense_core ThreatAssessment
+                threat_class = self._map_class_to_threat(tr.get('class_label', 'Unknown'))
+                target_type = self._map_class_to_target_type(tr.get('class_label', 'Unknown'))
+                confidence = float(tr.get('confidence', 0.5))
+                
+                defense_threat = DefenseThreatAssessment(
+                    track_id=tr['id'],
+                    threat_class=threat_class,
+                    target_type=target_type,
+                    classification_confidence=confidence,
+                    threat_priority=self._calculate_threat_priority(tr, threat_class),
+                    engagement_recommendation=self._get_engagement_recommendation(tr, threat_class),
+                    classification_uncertainty=1.0 - confidence,
+                    model_confidence=confidence,
+                    feature_quality=float(tr.get('stability', 0.5))
+                )
+                defense_threats.append(defense_threat)
+            
+            # ================================================================
+            # 2. Create scene context
+            # ================================================================
+            mean_snr = float(np.mean(rd_power[rd_power > 0])) if np.any(rd_power > 0) else 0.0
+            mean_snr_db = 10 * np.log10(mean_snr + 1e-10)
+            
+            defense_scene = DefenseSceneContext(
+                scene_type=self._classify_scene_type(len(tracks), num_detections),
+                clutter_ratio=self._calculate_clutter_ratio(len(tracks), num_detections),
+                mean_snr_db=float(mean_snr_db),
+                num_confirmed_tracks=len(tracks)
+            )
+            
+            # ================================================================
+            # 3. Create RadarIntelligencePacket
+            # ================================================================
+            packet = RadarIntelligencePacket.create(
+                frame_id=self.frame_count,
+                sensor_id=self.sensor_id,
+                tracks=defense_tracks,
+                threat_assessments=defense_threats,
+                scene_context=defense_scene,
+                overall_confidence=0.9,
+                data_quality=0.9
+            )
+            
+            # ================================================================
+            # 4. Publish to event bus (non-blocking)
+            # ================================================================
+            if self.enable_defense_core and self.defense_bus:
+                # Non-blocking publish with 10ms timeout
+                success = self.defense_bus.publish_intelligence(packet, timeout=0.01)
+                
+                if success:
+                    self.packets_sent += 1
+                    import logging
+                    logging.info(f"[PACKET_SENT] Frame {packet.frame_id}: "
+                                f"{len(packet.tracks)} tracks, "
+                                f"{len(packet.threat_assessments)} threats, "
+                                f"confidence={packet.overall_confidence:.2f}")
+                else:
+                    self.packets_dropped += 1
+                    import logging
+                    logging.warning(f"[PACKET_DROPPED] Frame {packet.frame_id}: Event bus full")
+                
+                # Debug mode: print packet details
+                if self.debug_packets:
+                    self._print_packet_debug(packet)
+            
+            # ================================================================
+            # 5. Legacy file-based export (backward compatibility)
+            # ================================================================
+            # Convert to legacy format for file export
+            legacy_tracks = []
+            legacy_threats = []
+            
+            for tr in tracks:
+                legacy_track = Track(
+                    track_id=tr['id'],
+                    range_m=float(tr['estimated_range_m']),
+                    azimuth_deg=self.scan_angle_deg,
+                    radial_velocity_m_s=float(tr['estimated_velocity_ms']),
+                    track_quality=float(tr.get('stability', 0.5)),
+                    track_age_frames=int(tr.get('age', 0)),
+                    last_update_timestamp=time.time(),
+                    radial_acceleration_m_s2=float(tr.get('estimated_acceleration_ms2', 0.0)) if 'estimated_acceleration_ms2' in tr else None
+                )
+                legacy_tracks.append(legacy_track)
+                
+                threat_class = self._map_class_to_threat(tr.get('class_label', 'Unknown'))
+                target_type = self._map_class_to_target_type(tr.get('class_label', 'Unknown'))
+                confidence = float(tr.get('confidence', 0.5))
+                
+                legacy_threat = ThreatAssessment(
+                    track_id=tr['id'],
+                    threat_class=threat_class,
+                    target_type=target_type,
+                    classification_confidence=confidence,
+                    threat_priority=self._calculate_threat_priority(tr, threat_class),
+                    engagement_recommendation=self._get_engagement_recommendation(tr, threat_class),
+                    classification_uncertainty=1.0 - confidence,
+                    position_uncertainty_m=10.0 * (1.0 - legacy_track.track_quality),
+                    velocity_uncertainty_m_s=5.0 * (1.0 - legacy_track.track_quality)
+                )
+                legacy_threats.append(legacy_threat)
+            
+            legacy_scene = SceneContext(
+                scene_type=self._classify_scene_type(len(tracks), num_detections),
+                clutter_ratio=self._calculate_clutter_ratio(len(tracks), num_detections),
+                mean_snr_db=float(mean_snr_db),
+                num_confirmed_tracks=len(tracks)
+            )
+            
+            legacy_message = TacticalPictureMessage.create(
+                frame_id=self.frame_count,
+                sensor_id=self.sensor_id,
+                tracks=legacy_tracks,
+                threat_assessments=legacy_threats,
+                scene_context=legacy_scene
+            )
+            
+            # Publish to file (non-blocking)
+            self.intelligence_publisher.publish(legacy_message)
+            
+        except Exception as e:
+            # Never let export errors crash radar processing
+            import logging
+            logging.error(f"Intelligence export failed (non-fatal): {e}")
+    
+    def _map_class_to_threat(self, class_label: str) -> str:
+        """Map AI class label to threat classification."""
+        threat_map = {
+            'Missile': ThreatClass.HOSTILE.value,
+            'Aircraft': ThreatClass.UNKNOWN.value,
+            'Drone': ThreatClass.UNKNOWN.value,
+            'Bird': ThreatClass.NEUTRAL.value,
+            'Noise': ThreatClass.NEUTRAL.value
+        }
+        return threat_map.get(class_label, ThreatClass.UNKNOWN.value)
+    
+    def _map_class_to_target_type(self, class_label: str) -> str:
+        """Map AI class label to target type."""
+        type_map = {
+            'Missile': TargetType.MISSILE.value,
+            'Aircraft': TargetType.AIRCRAFT.value,
+            'Drone': TargetType.UAV.value,
+            'Bird': TargetType.UNKNOWN.value,
+            'Noise': TargetType.UNKNOWN.value
+        }
+        return type_map.get(class_label, TargetType.UNKNOWN.value)
+    
+    def _calculate_threat_priority(self, track: Dict, threat_class: str) -> int:
+        """Calculate threat priority (1-10) based on track characteristics."""
+        if threat_class == ThreatClass.HOSTILE.value:
+            # High priority for hostile targets
+            base_priority = 8
+            # Increase priority for high-speed approaching targets
+            velocity = abs(track.get('estimated_velocity_ms', 0))
+            if velocity > 200:  # Fast moving (>200 m/s)
+                base_priority = min(10, base_priority + 2)
+            return base_priority
+        elif threat_class == ThreatClass.UNKNOWN.value:
+            return 5  # Medium priority
+        else:
+            return 2  # Low priority for neutral/friendly
+    
+    def _get_engagement_recommendation(self, track: Dict, threat_class: str) -> str:
+        """Determine engagement recommendation."""
+        if threat_class == ThreatClass.HOSTILE.value:
+            return EngagementRecommendation.ENGAGE.value
+        elif threat_class == ThreatClass.UNKNOWN.value:
+            return EngagementRecommendation.MONITOR.value
+        else:
+            return EngagementRecommendation.IGNORE.value
+    
+    def _classify_scene_type(self, num_tracks: int, num_detections: int) -> str:
+        """Classify scene type based on track/detection density."""
+        if num_tracks == 0:
+            return SceneType.SEARCH.value
+        elif num_tracks <= 2:
+            return SceneType.SPARSE.value
+        elif num_tracks <= 5:
+            return SceneType.TRACKING.value
+        elif num_tracks <= 10:
+            return SceneType.DENSE.value
+        else:
+            return SceneType.CLUTTERED.value
+    
+    def _calculate_clutter_ratio(self, num_tracks: int, num_detections: int) -> float:
+        """Calculate ratio of clutter to valid tracks."""
+        if num_detections == 0:
+            return 0.0
+        # Clutter = detections that didn't become tracks
+        clutter_count = max(0, num_detections - num_tracks)
+        return min(1.0, clutter_count / max(1, num_detections))
+    
+    def _print_packet_debug(self, packet: RadarIntelligencePacket):
+        """Print detailed packet information for debugging."""
+        print(f"\n{'='*80}")
+        print(f"[RADAR_PACKET] Frame {packet.frame_id} @ {packet.timestamp:.3f}s")
+        print(f"{'='*80}")
+        print(f"Sensor: {packet.sensor_id}")
+        print(f"Tracks: {len(packet.tracks)}")
+        print(f"Threats: {len(packet.threat_assessments)}")
+        print(f"Overall Confidence: {packet.overall_confidence:.2f}")
+        print(f"Data Quality: {packet.data_quality:.2f}")
+        print(f"Sensor Health: {packet.sensor_health:.2f}")
+        print(f"Sensor Mode: {packet.sensor_mode}")
+        
+        if packet.scene_context:
+            print(f"\nScene Context:")
+            print(f"  Type: {packet.scene_context.scene_type}")
+            print(f"  Clutter Ratio: {packet.scene_context.clutter_ratio:.2f}")
+            print(f"  Mean SNR: {packet.scene_context.mean_snr_db:.1f} dB")
+            print(f"  Confirmed Tracks: {packet.scene_context.num_confirmed_tracks}")
+        
+        for i, track in enumerate(packet.tracks):
+            print(f"\n  Track {track.track_id}:")
+            print(f"    Range: {track.range_m:.1f}m")
+            print(f"    Azimuth: {track.azimuth_deg:.1f}°")
+            print(f"    Velocity: {track.radial_velocity_m_s:.1f}m/s")
+            print(f"    Quality: {track.track_quality:.2f}")
+            print(f"    Age: {track.track_age_frames} frames")
+            print(f"    Position Uncertainty: {track.position_uncertainty_m:.1f}m")
+            print(f"    Velocity Uncertainty: {track.velocity_uncertainty_m_s:.1f}m/s")
+        
+        for i, threat in enumerate(packet.threat_assessments):
+            print(f"\n  Threat {threat.track_id}:")
+            print(f"    Class: {threat.threat_class}")
+            print(f"    Type: {threat.target_type}")
+            print(f"    Confidence: {threat.classification_confidence:.2f}")
+            print(f"    Uncertainty: {threat.classification_uncertainty:.2f}")
+            print(f"    Priority: {threat.threat_priority}/10")
+            print(f"    Recommendation: {threat.engagement_recommendation}")
+            print(f"    Model Confidence: {threat.model_confidence:.2f}")
+            print(f"    Feature Quality: {threat.feature_quality:.2f}")
+        
+        print(f"\nPacket Statistics:")
+        print(f"  Total Sent: {self.packets_sent}")
+        print(f"  Total Dropped: {self.packets_dropped}")
+        if self.packets_sent > 0:
+            print(f"  Drop Rate: {self.packets_dropped / self.packets_sent * 100:.2f}%")
+        print(f"{'='*80}\n")

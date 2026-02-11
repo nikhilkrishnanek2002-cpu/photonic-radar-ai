@@ -147,16 +147,28 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# PyCharm
-.idea/
+# Professional Project Structure
+logs/
+data/exports/
+*.log
 
-# Results and logs
-results/
-system.log
-
-# Junk files created by previous errors
+# Junk files created by previous errors/experiments
 cv2
 os
 tf
 .output.txt
-data/
+data/targets_*.csv
+
+# Deployment & IDE
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+
+# Distribution
+build/
+dist/
+*.egg-info/
+intelligence_export/
+data/real_world/data_SAAB_SIRS_77GHz_FMCW.npy
+data/real_world/data_SAAB_SIRS_77GHz_FMCW.npy

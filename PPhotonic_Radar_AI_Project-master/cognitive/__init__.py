@@ -50,11 +50,11 @@ from cognitive.parameters import (
 )
 
 from cognitive.pipeline import (
-    CognitiveRadarPipeline,
-    CognitiveRadarBridge,
-    CognitiveScenarioPlanner,
-    initialize_global_cognitive_radar,
-    get_global_cognitive_pipeline,
+    ModularCognitiveIntelligenceBridge,
+)
+
+from cognitive.intelligence_pipeline import (
+    EWIntelligencePipeline,
 )
 
 __version__ = "1.0.0"
@@ -71,15 +71,12 @@ __all__ = [
     "AdaptiveParameterCache",
     
     # Pipeline & integration
-    "CognitiveRadarPipeline",
-    "CognitiveRadarBridge",
-    "CognitiveScenarioPlanner",
+    "ModularCognitiveIntelligenceBridge",
+    "EWIntelligencePipeline",
     
     # Utilities
     "create_track_dict_for_cognitive",
     "extract_track_metrics",
     "convert_config_to_waveform_params",
     "waveform_params_to_photonic_config",
-    "initialize_global_cognitive_radar",
-    "get_global_cognitive_pipeline",
 ]
