@@ -1,13 +1,12 @@
-# Centralized configuration for PPhotonic Radar AI
 logging:
   level: INFO
-  dir: results
+  dir: runtime/logs
   file: system.log
   max_bytes: 10485760  # 10MB
   backup_count: 5
 
 model:
-  path: results/radar_model_pytorch.pt
+  path: runtime/models/radar_model_pytorch.pt
   checksum: ""  # sha256 hex string to validate model; leave empty to skip
   allow_unverified: true
 
@@ -66,7 +65,7 @@ cognitive_controller:
     weight_false_alarm: -0.5       # penalize false alarm rate
     weight_energy: -0.2            # penalize energy usage
     weight_tracks: 0.1             # reward for active tracks
-  policy_save_path: results/cognitive_policy.json
+  policy_save_path: runtime/results/cognitive_policy.json
 ew_defense:
   enabled: true                    # enable electronic warfare defense
   noise_history_size: 50           # number of frames to track for SNR analysis
@@ -135,7 +134,7 @@ security:
   
   # Audit & Logging
   audit_log_enabled: true          # enable security audit logging
-  audit_log_file: results/audit.log
+  audit_log_file: runtime/logs/audit.log
   log_all_permission_checks: false # verbose logging of permission checks
   export_audit_on_shutdown: true   # export audit log when system stops
   

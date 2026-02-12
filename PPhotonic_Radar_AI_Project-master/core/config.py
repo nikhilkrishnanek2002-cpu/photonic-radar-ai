@@ -19,13 +19,13 @@ def load_config(path=None):
     defaults = {
         "logging": {
             "level": "INFO",
-            "dir": "results",
+            "dir": "runtime/logs",
             "file": "system.log",
             "max_bytes": 10 * 1024 * 1024,
             "backup_count": 5
         },
         "model": {
-            "path": "results/radar_model_pytorch.pt",
+            "path": "runtime/models/radar_model_pytorch.pt",
             "checksum": "",
             "allow_unverified": True
         },

@@ -34,7 +34,7 @@ class EWFeedbackPublisher:
     
     def __init__(self,
                  effector_id: str = 'COGNITIVE_EW_01',
-                 export_directory: str = './ew_feedback',
+                 export_directory: str = 'runtime/ew_feedback',
                  enable_export: bool = True,
                  enable_event_bus: bool = False,
                  log_all_transmissions: bool = True):

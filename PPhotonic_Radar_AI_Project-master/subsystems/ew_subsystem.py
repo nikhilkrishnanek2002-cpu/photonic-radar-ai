@@ -12,6 +12,7 @@ import logging
 import threading
 import time
 from typing import Dict, Any, Optional
+from dataclasses import asdict
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class EWSubsystem:
             self.pipeline = EWIntelligencePipeline(
                 enable_ingestion=True,
                 ingestion_mode=self.config.get('ingestion_mode', 'event_bus'),
-                source_directory=self.config.get('intelligence_export_dir', './intelligence_export'),
+                source_directory=self.config.get('intelligence_export_dir', 'runtime/intelligence'),
                 staleness_threshold_s=self.config.get('staleness_threshold_s', 2.0),
                 poll_interval_s=self.config.get('ew_poll_interval_s', 0.1),
                 log_all_updates=self.config.get('log_all_updates', True)
@@ -105,8 +106,7 @@ class EWSubsystem:
                 self.waiting_for_data = False
                 self.intelligence_count += 1
                 
-                # Mock decision count increment for now as assessment doesn't expose it directly
-                # In full implementation we would check assessment details
+                # Mock decision count increment
                 self.decision_count += 1 
                 
                 result = {
@@ -119,14 +119,27 @@ class EWSubsystem:
                 
                 # Update shared tactical state
                 if self.tactical_state:
-                    # Determine active jamming based on recommendation
-                    rec = assessment.get('engagement_recommendation', 'MONITOR')
-                    jamming = rec in ['JAMMING', 'DECEPTION']
+                    # Determine active jamming based on adaptation command
+                    # Logic: If we have an adaptation command, we are nominally "ENGAGING"
+                    # But for now, we'll check if there's any active adaptation
+                    jamming = False
+                    rec = 'MONITOR'
+                    
+                    if self.pipeline.last_adaptation_command:
+                        rec = 'ADAPTING'
+                        # Simple heuristic: if any parameter is scaled significantly, we are active
+                        cmd = self.pipeline.last_adaptation_command
+                        if cmd.tx_power_scaling > 1.1 or cmd.bandwidth_scaling > 1.1:
+                            jamming = True
+                            rec = 'JAMMING'
+                    
+                    # Convert dataclass to dict for state storage
+                    assessment_data = asdict(assessment) if hasattr(assessment, '__dataclass_fields__') else assessment
                     
                     self.tactical_state.update_ew(
                         status="ENGAGING",
                         decision_count=self.decision_count,
-                        last_assessment=assessment.to_dict() if hasattr(assessment, 'to_dict') else assessment,
+                        last_assessment=assessment_data,
                         active_jamming=jamming
                     )
                 

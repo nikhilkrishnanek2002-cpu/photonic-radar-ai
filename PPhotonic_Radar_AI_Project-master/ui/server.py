@@ -146,20 +146,31 @@ def get_state():
         logger.warning(f"Event logging error: {e}")
             
     # Create response structure
+    # Create response structure
+    
+    # Extract raw detections from latest history record if available
+    latest_detections = []
+    det_history = radar_data.get('detection_history', [])
+    if det_history:
+        latest_detections = det_history[-1].get('detections', [])
+
     response = {
         "radar": {
-            "detections": radar_data.get('tracks', []),
-            "detection_history": radar_data.get('detection_history', []),
+            "detections": latest_detections,
+            "detection_history": det_history,
             "snr_history": [
                 {'frame': h['frame'], 'snr': h['mean_snr_db']} 
                 for h in radar_data.get('telemetry_history', [])
             ],
-            "tracks": radar_data.get('tracks', [])
+            "tracks": radar_data.get('tracks', []),
+            "threats": radar_data.get('threats', [])
         },
         "ew": {
             "active_jamming": "ACTIVE" if ew_data.get('active_jamming', False) else "INACTIVE",
             "decision": ew_data.get('last_assessment', {}).get('engagement_recommendation', 'MONITOR'),
-            "confidence": ew_data.get('last_assessment', {}).get('classification_confidence', 0.0)
+            "confidence": ew_data.get('last_assessment', {}).get('classification_confidence', 0.0),
+            "threat_level": ew_data.get('last_assessment', {}).get('threat_priority', 0),
+            "threat_class": ew_data.get('last_assessment', {}).get('threat_class', 'UNKNOWN')
         },
         "system": {
             "tick": snapshot.get('tick', 0),

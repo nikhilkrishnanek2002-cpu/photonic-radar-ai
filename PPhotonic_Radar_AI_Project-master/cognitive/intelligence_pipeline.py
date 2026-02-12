@@ -36,7 +36,7 @@ class EWIntelligencePipeline:
     def __init__(self,
                  enable_ingestion: bool = True,
                  ingestion_mode: str = 'file',
-                 source_directory: str = './intelligence_export',
+                 source_directory: str = 'runtime/intelligence',
                  staleness_threshold_s: float = 2.0,
                  poll_interval_s: float = 0.1,
                  log_all_updates: bool = True):
@@ -85,7 +85,7 @@ class EWIntelligencePipeline:
         from cognitive.ew_feedback_publisher import EWFeedbackPublisher
         self.feedback_publisher = EWFeedbackPublisher(
             effector_id='COGNITIVE_EW_01',
-            export_directory='./ew_feedback',
+            export_directory='runtime/ew_feedback',
             enable_export=True,
             enable_event_bus=enable_ingestion and ingestion_mode == 'event_bus',
             log_all_transmissions=log_all_updates
