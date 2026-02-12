@@ -277,18 +277,21 @@ def format_event(event: dict) -> str:
     message = event.get('message', 'No message')
     event_type = event.get('type', 'EVENT')
     
-    return f"""
-    <div class="event-item {severity_class}">
-        <span class="event-timestamp">[{timestamp}]</span> 
-        <strong>{event_type}</strong>: {message}
-    </div>
-    """
+    return f'<div class="event-item {severity_class}"><span class="event-timestamp">[{timestamp}]</span> <strong>{event_type}</strong>: {message}</div>'
 
-def render_radar_console(state):
+def render_radar_console(state, threats=None):
     """Render the radar console visualization."""
     r_stats = state.get('radar', {})
     tracks = r_stats.get('tracks', [])
     snr_history = r_stats.get('snr_history', [])
+    
+    # Create a mapping of track_id to threat_class
+    threat_map = {}
+    if threats:
+        for t in threats:
+            tid = t.get('id') or t.get('track_id')
+            if tid is not None:
+                threat_map[str(tid)] = t.get('threat_class', 'UNKNOWN')
     
     col1, col2 = st.columns([1, 1])
     
@@ -302,6 +305,7 @@ def render_radar_console(state):
             # Map threat class to color
             color_map = {
                 'FRIENDLY': '#4ade80',  # Green
+                'CIVILIAN': '#4ade80',  # Green mapping
                 'NEUTRAL': '#fbbf24',   # Yellow
                 'UNKNOWN': '#fb923c',   # Orange
                 'HOSTILE': '#ef4444'    # Red
@@ -312,10 +316,8 @@ def render_radar_console(state):
             
             # Add tracks
             for i, row in df.iterrows():
-                # Get threat class from track if available, else standard logic
-                # For now assume simulation provides class or we default
-                threat_class = 'UNKNOWN' 
-                # Ideally threat info is merged here, but for now use simple logic or mock
+                track_id = row.get('id') or row.get('track_id')
+                threat_class = threat_map.get(str(track_id), 'UNKNOWN')
                 
                 color = color_map.get(threat_class, '#fb923c')
                 
@@ -323,7 +325,7 @@ def render_radar_console(state):
                 r_val = row.get('range_m') or 0.0
                 az_val = row.get('azimuth_deg') or 0.0
                 v_val = row.get('radial_velocity_m_s') or 0.0
-                track_id = row.get('track_id', 'UNK')
+                track_id = row.get('id') or row.get('track_id') or 'UNK'
                 
                 fig.add_trace(go.Scatterpolar(
                     r=[r_val],
@@ -530,21 +532,45 @@ def main():
             # 2. TRACKS TABLE
             tracks = r_stats.get('tracks', [])
             if tracks:
+                # Add a display_id column that picks the best ID
                 df = pd.DataFrame(tracks)
-                cols_to_show = ['track_id', 'range_m', 'azimuth_deg', 'radial_velocity_m_s', 'track_quality']
+                if 'id' in df.columns or 'track_id' in df.columns:
+                    df['display_id'] = df.apply(lambda r: r.get('id') or r.get('track_id'), axis=1)
+                
+                cols_to_show = ['display_id', 'range_m', 'azimuth_deg', 'radial_velocity_m_s', 'track_quality', 'track_confidence_score']
                 available_cols = [c for c in cols_to_show if c in df.columns]
                 
                 if available_cols:
                     display_df = df[available_cols].copy()
-                    display_df.columns = ['Track ID', 'Range (m)', 'Azimuth (°)', 'Velocity (m/s)', 'Quality']
+                    # Rename columns for display
+                    rename_dict = {
+                        'display_id': 'Track ID',
+                        'range_m': 'Range (m)',
+                        'azimuth_deg': 'Azimuth (°)',
+                        'radial_velocity_m_s': 'Velocity (m/s)',
+                        'track_quality': 'Quality',
+                        'track_confidence_score': 'Quality'
+                    }
+                    display_df.rename(columns=rename_dict, inplace=True)
+                    
+                    # Apply styling conditionally based on available columns
+                    styler = display_df.style
+                    
+                    # Formatting
+                    fmt_dict = {}
+                    if 'Range (m)' in display_df.columns: fmt_dict['Range (m)'] = "{:.1f}"
+                    if 'Azimuth (°)' in display_df.columns: fmt_dict['Azimuth (°)'] = "{:.1f}"
+                    if 'Velocity (m/s)' in display_df.columns: fmt_dict['Velocity (m/s)'] = "{:.1f}"
+                    if 'Quality' in display_df.columns: fmt_dict['Quality'] = "{:.2f}"
+                    
+                    styler = styler.format(fmt_dict)
+                    
+                    # Gradient
+                    if 'Quality' in display_df.columns:
+                        styler = styler.background_gradient(subset=['Quality'], cmap='Greens')
                     
                     tracks_placeholder.dataframe(
-                        display_df.style.format({
-                            'Range (m)': "{:.1f}",
-                            'Azimuth (°)': "{:.1f}",
-                            'Velocity (m/s)': "{:.1f}",
-                            'Quality': "{:.2f}"
-                        }).background_gradient(subset=['Quality'], cmap='Greens'),
+                        styler,
                         use_container_width=True,
                         height=200
                     )
@@ -662,9 +688,9 @@ def main():
                 
             # 5. EVENT TICKER
             if events and isinstance(events.get('events'), list):
-                event_list = events['events']
+                event_list = events['events'][::-1] # Newest first
                 event_html_items = []
-                for event in event_list[:20]:  # Show last 20 events
+                for event in event_list[:30]:  # Show last 30 events
                     html = format_event(event)
                     if html:
                         event_html_items.append(html)
@@ -695,7 +721,8 @@ def main():
 
             # 7. UPDATE RADAR CONSOLE
             with tab_console:
-                render_radar_console(state)
+                threats = state.get('radar', {}).get('threats', [])
+                render_radar_console(state, threats)
 
         else:
             st.error("⚠️ API CONNECTION LOST - RECONNECTING...")

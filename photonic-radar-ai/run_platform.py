@@ -243,7 +243,7 @@ def initialize():
             ]
         },
         'simulation': {
-            'max_frames': 1000,
+            'max_frames': 100000,
             'frame_dt': 0.1
         }
     }

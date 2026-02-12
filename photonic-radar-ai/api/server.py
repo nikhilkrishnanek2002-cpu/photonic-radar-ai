@@ -54,9 +54,10 @@ class StateContainer:
     def __init__(self):
         self.state = None
         self.event_log = EventLog()
-        self.last_track_count = 0
-        self.last_threat_count = 0
+        self.last_track_ids = set()
+        self.last_threat_ids = set()
         self.last_decision_count = 0
+        self.monitor = None
 
 _SHARED = StateContainer()
 
@@ -214,52 +215,63 @@ class EventMonitor:
             time.sleep(0.1)  # 10Hz polling
 
     def _process_snapshot(self, snapshot: Dict[str, Any]):
-        """Detect changes and generate events."""
+        """Detect changes and generate events using ID tracking."""
         radar_data = snapshot.get('radar', {})
         ew_data = snapshot.get('ew', {})
         
-        current_track_count = len(radar_data.get('tracks', []))
-        current_threat_count = len(radar_data.get('threats', []))
+        current_tracks = radar_data.get('tracks', [])
+        current_threats = radar_data.get('threats', [])
         current_decision_count = ew_data.get('decision_count', 0)
         
-        # 1. Log new tracks
-        if current_track_count > self._shared.last_track_count:
-            new_tracks = current_track_count - self._shared.last_track_count
+        # Extract IDs - support both 'id' and 'track_id'
+        current_track_ids = {str(t.get('id') or t.get('track_id')) for t in current_tracks if (t.get('id') is not None or t.get('track_id') is not None)}
+        current_threat_ids = {str(t.get('id') or t.get('track_id')) for t in current_threats if (t.get('id') is not None or t.get('track_id') is not None)}
+        
+        # 1. Detect new/removed tracks
+        new_tracks = current_track_ids - self._shared.last_track_ids
+        lost_tracks = self._shared.last_track_ids - current_track_ids
+        
+        for tid in new_tracks:
             self._shared.event_log.add_event(
                 'TRACK_DETECTION', 'INFO',
-                f'{new_tracks} new track(s) detected',
-                {'count': new_tracks, 'total': current_track_count}
+                f'Track {tid} entered radar field',
+                {'track_id': tid}
             )
         
-        # 2. Log new threats
-        if current_threat_count > self._shared.last_threat_count:
-            new_threats = current_threat_count - self._shared.last_threat_count
-            threats = radar_data.get('threats', [])
-            if threats:
-                # Get the latest threat for details
-                latest_threat = threats[-1] if isinstance(threats[-1], dict) else {}
-                threat_class = latest_threat.get('threat_class', 'UNKNOWN')
-                priority = latest_threat.get('threat_priority', 0)
-                severity = 'CRITICAL' if priority >= 7 else 'WARNING' if priority >= 4 else 'INFO'
-                
-                self._shared.event_log.add_event(
-                    'THREAT_ASSESSMENT', severity,
-                    f'{threat_class} threat detected (Priority: {priority})',
-                    {'threat_class': threat_class, 'priority': priority}
-                )
+        for tid in lost_tracks:
+            self._shared.event_log.add_event(
+                'TRACK_EXIT', 'INFO',
+                f'Track {tid} lost or exited field',
+                {'track_id': tid}
+            )
+            
+        # 2. Detect new/removed threats
+        new_threats = current_threat_ids - self._shared.last_threat_ids
+        for tid in new_threats:
+            # Find the threat details
+            threat_info = next((t for t in current_threats if str(t.get('track_id')) == tid), {})
+            threat_class = threat_info.get('threat_class', 'UNKNOWN')
+            priority = threat_info.get('threat_priority', 0)
+            severity = 'CRITICAL' if priority >= 7 else 'WARNING' if priority >= 4 else 'INFO'
+            
+            self._shared.event_log.add_event(
+                'THREAT_ASSESSMENT', severity,
+                f'{threat_class} threat detected: ID {tid} (Priority: {priority})',
+                {'track_id': tid, 'threat_class': threat_class, 'priority': priority}
+            )
         
         # 3. Log new EW decisions
         if current_decision_count > self._shared.last_decision_count:
-            new_decisions = current_decision_count - self._shared.last_decision_count
+            diff = current_decision_count - self._shared.last_decision_count
             self._shared.event_log.add_event(
                 'EW_DECISION', 'INFO',
-                f'{new_decisions} new EW decision(s) made',
-                {'count': new_decisions, 'total': current_decision_count}
+                f'{diff} new EW decision(s) made',
+                {'count': diff, 'total': current_decision_count}
             )
         
-        # Update counters
-        self._shared.last_track_count = current_track_count
-        self._shared.last_threat_count = current_threat_count
+        # Update state
+        self._shared.last_track_ids = current_track_ids
+        self._shared.last_threat_ids = current_threat_ids
         self._shared.last_decision_count = current_decision_count
 
 # Process-local monitor tracking
@@ -269,8 +281,9 @@ def ensure_monitor():
     """Ensure the event monitor is running in this process."""
     global _MONITOR_INITIALIZED
     if not _MONITOR_INITIALIZED:
-        monitor = EventMonitor(_SHARED)
-        monitor.start()
+        if _SHARED.monitor is None:
+            _SHARED.monitor = EventMonitor(_SHARED)
+        _SHARED.monitor.start()
         _MONITOR_INITIALIZED = True
         logger.info(f"[UI] Event monitor initialized in process {os.getpid()}")
 
