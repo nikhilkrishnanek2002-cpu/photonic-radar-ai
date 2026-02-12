@@ -39,7 +39,14 @@ class TacticalState:
         self.queue_sizes: Dict[str, int] = {}
         
         # Persistence
-        self.persistence_path = "runtime/shared_state.json"
+        from pathlib import Path
+        # Determine PROJECT_ROOT: defense_core/..
+        self.project_root = Path(__file__).resolve().parent.parent
+        self.persistence_path = self.project_root / "runtime" / "shared_state.json"
+        
+        # Ensure runtime dir exists
+        self.persistence_path.parent.mkdir(parents=True, exist_ok=True)
+        
         self.last_persist_time = 0
         self.persistence_lock = threading.Lock()
         
@@ -63,11 +70,13 @@ class TacticalState:
                     return obj.__dict__
                 return str(obj)
 
+                self.persistence_path.parent.mkdir(parents=True, exist_ok=True)
             with self.persistence_lock:
-                with open(self.persistence_path + '.tmp', 'w') as f:
+                temp_path = str(self.persistence_path) + '.tmp'
+                with open(temp_path, 'w') as f:
                     json.dump(snapshot, f, default=default_serializer)
                 
-                os.rename(self.persistence_path + '.tmp', self.persistence_path)
+                os.rename(temp_path, self.persistence_path)
             
             self.last_persist_time = now
         except Exception as e:

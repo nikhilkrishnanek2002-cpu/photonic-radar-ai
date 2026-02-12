@@ -9,9 +9,16 @@ from flask import Flask, jsonify
 from typing import Optional, Dict, Any, List
 from collections import deque
 from datetime import datetime
+import sys
 
 # Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
+
+from pathlib import Path
+# Determine PROJECT_ROOT: api/..
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SHARED_STATE_PATH = PROJECT_ROOT / "runtime" / "shared_state.json"
 
 # Flask App
 app = Flask(__name__)
@@ -69,20 +76,18 @@ def health():
     uptime = 0
     
     try:
-         shared_state_path = "runtime/shared_state.json"
-         if os.path.exists(shared_state_path):
-            mtime = os.path.getmtime(shared_state_path)
+         if SHARED_STATE_PATH.exists():
+            mtime = SHARED_STATE_PATH.stat().st_mtime
             if time.time() - mtime < 5.0:
                 fresh = True
                 # Try to read uptime
                 try:
-                    with open(shared_state_path, 'r') as f:
+                    with open(SHARED_STATE_PATH, 'r') as f:
                         data = json.load(f)
                         uptime = data.get('uptime', 0)
-                except:
-                    pass
-    except:
-        pass
+                except Exception as read_e:
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
     if _SHARED.state:
         fresh = _SHARED.state.running
@@ -100,13 +105,13 @@ def get_state():
     snapshot = None
     
     # Try reading from shared state file (IPC mode)
+    # Try reading from shared state file (IPC mode)
     try:
-        shared_state_path = "runtime/shared_state.json"
-        if os.path.exists(shared_state_path):
+        if SHARED_STATE_PATH.exists():
             # Check modification time to ensure freshness
-            mtime = os.path.getmtime(shared_state_path)
+            mtime = SHARED_STATE_PATH.stat().st_mtime
             if time.time() - mtime < 2.0: # Only accept if fresh
-                with open(shared_state_path, 'r') as f:
+                with open(SHARED_STATE_PATH, 'r') as f:
                     snapshot = json.load(f)
     except Exception as e:
         logger.error(f"Failed to read shared state file: {e}")

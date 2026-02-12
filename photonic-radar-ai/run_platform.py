@@ -31,7 +31,9 @@ import sys
 import os
 import signal
 import logging
+import threading
 import time
+import requests
 import subprocess
 import threading
 import argparse
@@ -317,26 +319,23 @@ def start_subsystems():
         # This makes it resilient to directory changes as long as the module is in path
         import importlib.util
         
-        if not importlib.util.find_spec("api.server"):
-             logger.error(f"[BOOT] API Server module 'api.server' not found")
+        if not importlib.util.find_spec("uvicorn"):
+             logger.error(f"[BOOT] 'uvicorn' module not found. Please install it.")
              return False
 
         # Command: python -m api.server
-        cmd = [sys.executable, "-m", "api.server"]
+        cmd = [
+            sys.executable, "-m", "api.server"
+        ]
         
-        logger.info(f"[BOOT] Starting UI API Server (Uvicorn via module)...")
+        logger.info(f"[BOOT] Starting UI API Server (uvicorn api.server:app)...")
         # Start as subprocess
         # Use PROJECT_ROOT as cwd
         state.api_process = subprocess.Popen(
             cmd,
             cwd=str(PROJECT_ROOT),
-            # stdout=subprocess.DEVNULL, 
-            # stderr=subprocess.DEVNULL
-            # Let it print to console for now as user requested "Print when API becomes healthy"
-            # actually user said "Print when API becomes healthy", not "Let it print".
-            # Clean output is better.
-             stdout=subprocess.DEVNULL, 
-             stderr=sys.stderr
+            stdout=subprocess.DEVNULL, 
+            stderr=sys.stderr
         )
         # Non-blocking start - health check will be done by dashboard launcher thread
         logger.info(f"[BOOT] API Server subprocess started (PID: {state.api_process.pid})")
@@ -387,25 +386,21 @@ def start_subsystems():
             retries -= 1
         
         if retries <= 0:
-            logger.warning("[DASHBOARD] ⚠ API Server health check timeout")
-            logger.warning("[DASHBOARD] Launching dashboard anyway (might need refresh)...")
+            logger.error("[DASHBOARD] ⚠ API Server health check FAILED (Timeout)")
+            logger.error("[DASHBOARD] Aborting dashboard launch.")
+            return
         
         # Start Streamlit as subprocess
         # Start Streamlit as subprocess
         try:
             # Detect dashboard file
             dashboard_path = PROJECT_ROOT / "ui" / "dashboard.py"
-            legacy_path = PROJECT_ROOT / "app.py"
             
-            target_script = None
-            if dashboard_path.exists():
-                target_script = dashboard_path
-            elif legacy_path.exists():
-                logger.warning(f"[DASHBOARD] 'ui/dashboard.py' not found, falling back to 'app.py'")
-                target_script = legacy_path
-            else:
-                logger.error("[DASHBOARD] Could not find 'ui/dashboard.py' or 'app.py'")
+            if not dashboard_path.exists():
+                logger.error(f"[DASHBOARD] Could not find '{dashboard_path}'")
                 return
+
+            target_script = dashboard_path
 
             subprocess.Popen(
                 [sys.executable, "-m", "streamlit", "run", str(target_script),
