@@ -46,6 +46,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # Define Project Root
 # This file is expected to be in the project root
 PROJECT_ROOT = Path(__file__).resolve().parent
+RUNTIME_DIR = PROJECT_ROOT / "runtime"
 
 # Ensure Project Root is in sys.path for robust imports
 if str(PROJECT_ROOT) not in sys.path:
@@ -53,7 +54,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Configure logging to console and file
 # Use absolute paths
-log_dir = PROJECT_ROOT / "runtime" / "logs"
+log_dir = RUNTIME_DIR / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
 log_file = log_dir / "system_platform.log"
 
@@ -329,16 +330,19 @@ def start_subsystems():
         ]
         
         logger.info(f"[BOOT] Starting UI API Server (uvicorn api.server:app)...")
-        # Start as subprocess
-        # Use PROJECT_ROOT as cwd
+        # Start as subprocess with logging
+        api_log_path = RUNTIME_DIR / "api_server.log"
+        api_log_file = open(api_log_path, 'w')
+        
         state.api_process = subprocess.Popen(
             cmd,
             cwd=str(PROJECT_ROOT),
-            stdout=subprocess.DEVNULL, 
-            stderr=sys.stderr
+            stdout=api_log_file, 
+            stderr=subprocess.STDOUT
         )
         # Non-blocking start - health check will be done by dashboard launcher thread
         logger.info(f"[BOOT] API Server subprocess started (PID: {state.api_process.pid})")
+        logger.info(f"       Log: {api_log_path}")
 
     except Exception as e:
         logger.warning(f"[BOOT] UI Server failed to start: {e}")

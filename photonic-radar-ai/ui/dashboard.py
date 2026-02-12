@@ -138,7 +138,8 @@ st.markdown("""
         border: 1px solid #4ade80;
         border-radius: 5px;
         padding: 10px;
-        max-height: 400px;
+        height: 350px;
+        min-height: 350px;
         overflow-y: auto;
         font-family: 'Courier New', monospace;
         font-size: 12px;
@@ -200,6 +201,7 @@ st.markdown("""
         border-radius: 5px;
         padding: 15px;
         margin: 10px 0;
+        min-height: 180px;
     }
     
     .panel-title {
@@ -266,10 +268,14 @@ def get_priority_badge(priority: int) -> str:
 
 def format_event(event: dict) -> str:
     """Format event for display."""
-    severity_class = f"event-{event['severity'].lower()}"
-    timestamp = event.get('timestamp', '')
-    message = event.get('message', '')
-    event_type = event.get('type', '')
+    if not isinstance(event, dict):
+        return ""
+        
+    severity = str(event.get('severity', 'INFO')).lower()
+    severity_class = f"event-{severity}"
+    timestamp = event.get('timestamp', '--:--:--')
+    message = event.get('message', 'No message')
+    event_type = event.get('type', 'EVENT')
     
     return f"""
     <div class="event-item {severity_class}">
@@ -313,18 +319,24 @@ def render_radar_console(state):
                 
                 color = color_map.get(threat_class, '#fb923c')
                 
+                # Safe defaults for formatting
+                r_val = row.get('range_m') or 0.0
+                az_val = row.get('azimuth_deg') or 0.0
+                v_val = row.get('radial_velocity_m_s') or 0.0
+                track_id = row.get('track_id', 'UNK')
+                
                 fig.add_trace(go.Scatterpolar(
-                    r=[row.get('range_m', 0)],
-                    theta=[row.get('azimuth_deg', 0)],
+                    r=[r_val],
+                    theta=[az_val],
                     mode='markers',
                     marker=dict(
                         size=12,
                         color=color,
                         line=dict(color='white', width=1)
                     ),
-                    name=f"Track {row.get('track_id')}",
+                    name=f"Track {track_id}",
                     hoverinfo='text',
-                    text=f"ID: {row.get('track_id')}<br>R: {row.get('range_m'):.1f}m<br>Az: {row.get('azimuth_deg'):.1f}°<br>V: {row.get('radial_velocity_m_s'):.1f}m/s"
+                    text=f"ID: {track_id}<br>R: {r_val:.1f}m<br>Az: {az_val:.1f}°<br>V: {v_val:.1f}m/s"
                 ))
             
             # Add EW Jamming Overlay (Mock based on EW status)
@@ -482,8 +494,8 @@ def main():
                 
             with header_col2:
                 r_stats = state.get('radar', {})
-                r_status = "ONLINE" if r_stats.get('initialized') else "OFFLINE"
-                track_count = r_stats.get('track_count', 0)
+                r_status = "ONLINE" if r_stats.get('status') != "OFFLINE" else "OFFLINE"
+                track_count = len(r_stats.get('tracks', []))
                 status_class = "status-online" if r_status == "ONLINE" else "status-offline"
                 st.markdown(f"""
                 <div class="metric-card">
@@ -495,9 +507,9 @@ def main():
             with header_col3:
                 e_stats = state.get('ew', {})
                 decisions = e_stats.get('decision_count', 0)
-                waiting = e_stats.get('waiting_for_data', False)
-                ew_status = "WAITING" if waiting else "ENGAGING"
-                status_class = "status-waiting" if waiting else "status-online"
+                active = e_stats.get('active_jamming', False)
+                ew_status = "ENGAGING" if active else "SCANNING"
+                status_class = "status-online" if active else "status-waiting"
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-value">{decisions}</div>
@@ -559,7 +571,7 @@ def main():
                     # Style the chart
                     fig.update_traces(
                         line_color='#4ade80',
-                        fill_color='rgba(74, 222, 128, 0.2)'
+                        fillcolor='rgba(74, 222, 128, 0.2)'
                     )
                     
                     fig.update_layout(
@@ -649,13 +661,19 @@ def main():
                 ew_placeholder.info("⏳ NO EW ASSESSMENT DATA")
                 
             # 5. EVENT TICKER
-            if events and events.get('events'):
+            if events and isinstance(events.get('events'), list):
                 event_list = events['events']
-                event_html = '<div class="event-ticker">'
+                event_html_items = []
                 for event in event_list[:20]:  # Show last 20 events
-                    event_html += format_event(event)
-                event_html += '</div>'
-                events_placeholder.markdown(event_html, unsafe_allow_html=True)
+                    html = format_event(event)
+                    if html:
+                        event_html_items.append(html)
+                
+                if event_html_items:
+                    event_html = '<div class="event-ticker">' + "".join(event_html_items) + '</div>'
+                    events_placeholder.markdown(event_html, unsafe_allow_html=True)
+                else:
+                    events_placeholder.info("📡 WAITING FOR SYSTEM EVENTS...")
             else:
                 events_placeholder.info("📡 NO EVENTS LOGGED")
             

@@ -70,7 +70,6 @@ class TacticalState:
                     return obj.__dict__
                 return str(obj)
 
-                self.persistence_path.parent.mkdir(parents=True, exist_ok=True)
             with self.persistence_lock:
                 temp_path = str(self.persistence_path) + '.tmp'
                 with open(temp_path, 'w') as f:
@@ -80,8 +79,8 @@ class TacticalState:
             
             self.last_persist_time = now
         except Exception as e:
-            print(f"State persistence failed: {e}")
-            # pass
+            # Silently catch persistence errors to avoid stalling main threads
+            pass
 
     def update_tick(self, tick: int):
         """Update simulation tick."""

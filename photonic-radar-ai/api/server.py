@@ -86,6 +86,7 @@ def health():
                         data = json.load(f)
                         uptime = data.get('uptime', 0)
                 except Exception as read_e:
+                    pass
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -134,58 +135,6 @@ def get_state():
     # Mock s.running for file mode
     system_running = snapshot.get('ew', {}).get('status') != 'OFFLINE'
     
-    # Event logging: detect changes and log events
-    try:
-        current_track_count = len(radar_data.get('tracks', []))
-        current_threat_count = len(radar_data.get('threats', []))
-        current_decision_count = ew_data.get('decision_count', 0)
-        
-        # Log new tracks
-        if current_track_count > _SHARED.last_track_count:
-            new_tracks = current_track_count - _SHARED.last_track_count
-            _SHARED.event_log.add_event(
-                'TRACK_DETECTION',
-                'INFO',
-                f'{new_tracks} new track(s) detected',
-                {'count': new_tracks, 'total': current_track_count}
-            )
-        
-        # Log new threats
-        if current_threat_count > _SHARED.last_threat_count:
-            new_threats = current_threat_count - _SHARED.last_threat_count
-            threats = radar_data.get('threats', [])
-            # Get the latest threat for details
-            if threats:
-                latest_threat = threats[-1] if isinstance(threats[-1], dict) else {}
-                threat_class = latest_threat.get('threat_class', 'UNKNOWN')
-                priority = latest_threat.get('threat_priority', 0)
-                severity = 'CRITICAL' if priority >= 7 else 'WARNING' if priority >= 4 else 'INFO'
-                
-                _SHARED.event_log.add_event(
-                    'THREAT_ASSESSMENT',
-                    severity,
-                    f'{threat_class} threat detected (Priority: {priority})',
-                    {'threat_class': threat_class, 'priority': priority}
-                )
-        
-        # Log new EW decisions
-        if current_decision_count > _SHARED.last_decision_count:
-            new_decisions = current_decision_count - _SHARED.last_decision_count
-            _SHARED.event_log.add_event(
-                'EW_DECISION',
-                'INFO',
-                f'{new_decisions} new EW decision(s) made',
-                {'count': new_decisions, 'total': current_decision_count}
-            )
-        
-        # Update counters
-        _SHARED.last_track_count = current_track_count
-        _SHARED.last_threat_count = current_threat_count
-        _SHARED.last_decision_count = current_decision_count
-        
-    except Exception as e:
-        logger.warning(f"Event logging error: {e}")
-            
     # Create response structure
     # Create response structure
     
@@ -231,6 +180,105 @@ def get_events():
         'count': len(events)
     })
 
+class EventMonitor:
+    """Background monitor that watches for state changes and generates events."""
+    
+    def __init__(self, state_container: StateContainer):
+        self._shared = state_container
+        self.running = False
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self):
+        """Start the monitor thread."""
+        if not self.running:
+            self.running = True
+            self._thread = threading.Thread(target=self._monitor_loop, name="EventMonitor")
+            self._thread.daemon = True
+            self._thread.start()
+            logger.info("[UI] Event monitor thread started")
+
+    def _monitor_loop(self):
+        """Main loop that polls shared state and generates events."""
+        while self.running:
+            try:
+                # Read snapshot from file (IPC mode)
+                if SHARED_STATE_PATH.exists():
+                    mtime = SHARED_STATE_PATH.stat().st_mtime
+                    if time.time() - mtime < 2.0:
+                        with open(SHARED_STATE_PATH, 'r') as f:
+                            snapshot = json.load(f)
+                        self._process_snapshot(snapshot)
+            except Exception as e:
+                logger.error(f"Event monitor error: {e}")
+            
+            time.sleep(0.1)  # 10Hz polling
+
+    def _process_snapshot(self, snapshot: Dict[str, Any]):
+        """Detect changes and generate events."""
+        radar_data = snapshot.get('radar', {})
+        ew_data = snapshot.get('ew', {})
+        
+        current_track_count = len(radar_data.get('tracks', []))
+        current_threat_count = len(radar_data.get('threats', []))
+        current_decision_count = ew_data.get('decision_count', 0)
+        
+        # 1. Log new tracks
+        if current_track_count > self._shared.last_track_count:
+            new_tracks = current_track_count - self._shared.last_track_count
+            self._shared.event_log.add_event(
+                'TRACK_DETECTION', 'INFO',
+                f'{new_tracks} new track(s) detected',
+                {'count': new_tracks, 'total': current_track_count}
+            )
+        
+        # 2. Log new threats
+        if current_threat_count > self._shared.last_threat_count:
+            new_threats = current_threat_count - self._shared.last_threat_count
+            threats = radar_data.get('threats', [])
+            if threats:
+                # Get the latest threat for details
+                latest_threat = threats[-1] if isinstance(threats[-1], dict) else {}
+                threat_class = latest_threat.get('threat_class', 'UNKNOWN')
+                priority = latest_threat.get('threat_priority', 0)
+                severity = 'CRITICAL' if priority >= 7 else 'WARNING' if priority >= 4 else 'INFO'
+                
+                self._shared.event_log.add_event(
+                    'THREAT_ASSESSMENT', severity,
+                    f'{threat_class} threat detected (Priority: {priority})',
+                    {'threat_class': threat_class, 'priority': priority}
+                )
+        
+        # 3. Log new EW decisions
+        if current_decision_count > self._shared.last_decision_count:
+            new_decisions = current_decision_count - self._shared.last_decision_count
+            self._shared.event_log.add_event(
+                'EW_DECISION', 'INFO',
+                f'{new_decisions} new EW decision(s) made',
+                {'count': new_decisions, 'total': current_decision_count}
+            )
+        
+        # Update counters
+        self._shared.last_track_count = current_track_count
+        self._shared.last_threat_count = current_threat_count
+        self._shared.last_decision_count = current_decision_count
+
+# Process-local monitor tracking
+_MONITOR_INITIALIZED = False
+
+def ensure_monitor():
+    """Ensure the event monitor is running in this process."""
+    global _MONITOR_INITIALIZED
+    if not _MONITOR_INITIALIZED:
+        monitor = EventMonitor(_SHARED)
+        monitor.start()
+        _MONITOR_INITIALIZED = True
+        logger.info(f"[UI] Event monitor initialized in process {os.getpid()}")
+
+@app.before_request
+def check_monitor():
+    """Check monitor on every request (first one will trigger initialization)."""
+    ensure_monitor()
+
 def run_server_thread():
     """Target for the server thread."""
     logger.info("[UI] Starting API Server on port 5000...")
@@ -245,6 +293,10 @@ def start_server(shared_state_obj):
         shared_state_obj: The LauncherState instance
     """
     _SHARED.state = shared_state_obj
+    
+    # Start Event Monitor first
+    monitor = EventMonitor(_SHARED)
+    monitor.start()
     
     t = threading.Thread(target=run_server_thread, name="APIServer")
     t.daemon = True
@@ -261,6 +313,10 @@ def start_server(shared_state_obj):
     threading.Thread(target=open_browser, daemon=True).start()
 
 if __name__ == "__main__":
+    # Start Event Monitor if running as standalone process
+    monitor = EventMonitor(_SHARED)
+    monitor.start()
+    
     try:
         import uvicorn
         # Run using Uvicorn (Production-grade ASGI/WSGI server)
