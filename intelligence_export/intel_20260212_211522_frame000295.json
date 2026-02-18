@@ -1,0 +1,37 @@
+{
+  "message_id": "874cbbc8-be65-484e-b12b-775056c635d7",
+  "timestamp": 1770911122.139313,
+  "frame_id": 295,
+  "sensor_id": "PHOENIX_RADAR_01",
+  "tracks": [
+    {
+      "track_id": 2,
+      "range_m": 294.2601870286088,
+      "azimuth_deg": 216.0,
+      "radial_velocity_m_s": 2.290136730034497,
+      "track_quality": 0.5,
+      "track_age_frames": 0,
+      "last_update_timestamp": 1770911122.1392617,
+      "radial_acceleration_m_s2": 0.0006533422588224605
+    }
+  ],
+  "threat_assessments": [
+    {
+      "track_id": 2,
+      "threat_class": "UNKNOWN",
+      "target_type": "AIRCRAFT",
+      "classification_confidence": 0.28735294938087463,
+      "threat_priority": 5,
+      "engagement_recommendation": "MONITOR",
+      "classification_uncertainty": 0.7126470506191254,
+      "position_uncertainty_m": 5.0,
+      "velocity_uncertainty_m_s": 2.5
+    }
+  ],
+  "scene_context": {
+    "scene_type": "SPARSE",
+    "clutter_ratio": 0.0,
+    "mean_snr_db": -96.79975127510386,
+    "num_confirmed_tracks": 1
+  }
+}

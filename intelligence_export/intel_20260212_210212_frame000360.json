@@ -1,0 +1,58 @@
+{
+  "message_id": "4f284932-8e6c-4eae-b2ec-9e569d0af6fc",
+  "timestamp": 1770910332.1185215,
+  "frame_id": 360,
+  "sensor_id": "PHOENIX_RADAR_01",
+  "tracks": [
+    {
+      "track_id": 4,
+      "range_m": 226.8088247729013,
+      "azimuth_deg": 36.0,
+      "radial_velocity_m_s": -3.7952177160543417,
+      "track_quality": 0.5,
+      "track_age_frames": 0,
+      "last_update_timestamp": 1770910332.1184466,
+      "radial_acceleration_m_s2": -0.0020899978223716306
+    },
+    {
+      "track_id": 5,
+      "range_m": 227.1881881141753,
+      "azimuth_deg": 36.0,
+      "radial_velocity_m_s": 3.735917439240993,
+      "track_quality": 0.5,
+      "track_age_frames": 0,
+      "last_update_timestamp": 1770910332.118481,
+      "radial_acceleration_m_s2": 0.0020573416063974174
+    }
+  ],
+  "threat_assessments": [
+    {
+      "track_id": 4,
+      "threat_class": "UNKNOWN",
+      "target_type": "AIRCRAFT",
+      "classification_confidence": 0.36141273379325867,
+      "threat_priority": 5,
+      "engagement_recommendation": "MONITOR",
+      "classification_uncertainty": 0.6385872662067413,
+      "position_uncertainty_m": 5.0,
+      "velocity_uncertainty_m_s": 2.5
+    },
+    {
+      "track_id": 5,
+      "threat_class": "UNKNOWN",
+      "target_type": "AIRCRAFT",
+      "classification_confidence": 0.3614075779914856,
+      "threat_priority": 5,
+      "engagement_recommendation": "MONITOR",
+      "classification_uncertainty": 0.6385924220085144,
+      "position_uncertainty_m": 5.0,
+      "velocity_uncertainty_m_s": 2.5
+    }
+  ],
+  "scene_context": {
+    "scene_type": "SPARSE",
+    "clutter_ratio": 0.0,
+    "mean_snr_db": -54.280302771449335,
+    "num_confirmed_tracks": 2
+  }
+}

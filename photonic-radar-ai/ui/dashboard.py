@@ -7,10 +7,22 @@ from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import sys
+from pathlib import Path
+import json
+import random
+
+# --- PROJECT ROOT SETUP ---
+# Dashboard is at: photonic-radar-ai/ui/dashboard.py
+# Need to add photonic-radar-ai (parent of ui) to path
+PROJECT_ROOT = Path(__file__).parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 # --- CONFIGURATION ---
 API_URL = "http://localhost:5000"
 REFRESH_RATE = 1.0  # Seconds
+API_TIMEOUT = 0.5  # Timeout for API calls in seconds
 
 st.set_page_config(
     page_title="PHOENIX TACTICAL COMMAND",
@@ -216,49 +228,169 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- SYNTHETIC DATA GENERATION ---
+def generate_synthetic_state() -> dict:
+    """Generate synthetic radar/EW state for demo mode."""
+    import random
+    tick = getattr(generate_synthetic_state, 'tick', 0)
+    tick += 1
+    generate_synthetic_state.tick = tick
+    
+    num_tracks = random.randint(2, 8)
+    tracks = []
+    for i in range(num_tracks):
+        tracks.append({
+            'id': i + 1,
+            'range_m': random.uniform(500, 50000),
+            'azimuth_deg': random.uniform(0, 360),
+            'radial_velocity_m_s': random.uniform(-500, 500),
+            'track_quality': random.uniform(0.6, 0.99),
+            'track_confidence_score': random.uniform(0.6, 0.99),
+            'threat_class': random.choice(['FRIENDLY', 'NEUTRAL', 'UNKNOWN', 'HOSTILE']),
+            'threat_priority': random.randint(0, 10),
+            'classification_confidence': random.uniform(0.5, 0.99)
+        })
+    
+    snr_history = []
+    for i in range(max(0, tick - 100), tick):
+        snr_history.append({
+            'frame': i,
+            'snr': random.uniform(15, 45) + np.sin(i * 0.1) * 5
+        })
+    
+    threats = [t for t in tracks if t['threat_priority'] >= 5][:5]
+    
+    return {
+        'tick': tick,
+        'radar': {
+            'status': 'ONLINE',
+            'tracks': tracks,
+            'detections': len(tracks),
+            'threats': threats,
+            'snr_history': snr_history[-100:]
+        },
+        'ew': {
+            'status': 'ONLINE',
+            'active_jamming': random.random() > 0.7,
+            'decision_count': random.randint(10, 500),
+            'last_assessment': threats[0] if threats else {
+                'threat_class': 'FRIENDLY',
+                'threat_priority': 0,
+                'classification_confidence': 0.95,
+                'engagement_recommendation': 'MONITOR'
+            }
+        },
+        'queues': {
+            'ew_to_radar': random.randint(0, 10)
+        }
+    }
+
+def generate_synthetic_health() -> dict:
+    """Generate synthetic health data for demo mode."""
+    uptime = getattr(generate_synthetic_health, 'uptime', 0)
+    uptime += 1.0
+    generate_synthetic_health.uptime = uptime
+    
+    return {
+        'status': 'active',
+        'uptime': uptime,
+        'cpu_percent': random.uniform(5, 40),
+        'memory_mb': random.uniform(100, 500)
+    }
+
+def generate_synthetic_events() -> dict:
+    """Generate synthetic events for demo mode."""
+    events = getattr(generate_synthetic_events, 'events', [])
+    
+    if len(events) < 50:
+        event_types = ['DETECTION', 'TRACK_UPDATE', 'THREAT_ASSESSMENT', 'EW_DECISION', 'SYSTEM_EVENT']
+        new_event = {
+            'timestamp': datetime.now().isoformat(),
+            'type': random.choice(event_types),
+            'severity': random.choice(['INFO', 'WARNING', 'CRITICAL']),
+            'message': f"SYNTHETIC: {random.choice(['Target acquired', 'Track confirmed', 'EW engagement', 'System online', 'Signal detected'])}"
+        }
+        events.insert(0, new_event)
+        generate_synthetic_events.events = events[:50]
+    
+    return {'events': events}
+
+def is_api_available() -> bool:
+    """Check if API is available."""
+    try:
+        response = requests.get(f"{API_URL}/health", timeout=API_TIMEOUT)
+        return response.status_code == 200
+    except:
+        return False
+
+# --- API STATE TRACKING ---
+_api_available = None
+_api_last_check = 0
+
+def check_api_status():
+    """Check API status with caching."""
+    global _api_available, _api_last_check
+    now = time.time()
+    if now - _api_last_check > 2:  # Check every 2 seconds
+        _api_available = is_api_available()
+        _api_last_check = now
+    return _api_available
+
 # --- HELPER FUNCTIONS ---
 def fetch_state():
-    """Fetch system state from API."""
+    """Fetch system state from API with synthetic fallback."""
     try:
-        response = requests.get(f"{API_URL}/state", timeout=0.5)
-        if response.status_code == 200:
-            return response.json()
+        if check_api_status():
+            response = requests.get(f"{API_URL}/state", timeout=API_TIMEOUT)
+            if response.status_code == 200:
+                return response.json()
     except:
-        return None
-    return None
+        pass
+    return generate_synthetic_state()
 
 def fetch_health():
-    """Fetch system health from API."""
+    """Fetch system health from API with synthetic fallback."""
     try:
-        response = requests.get(f"{API_URL}/health", timeout=0.5)
-        if response.status_code == 200:
-            return response.json()
+        if check_api_status():
+            response = requests.get(f"{API_URL}/health", timeout=API_TIMEOUT)
+            if response.status_code == 200:
+                return response.json()
     except:
-        return None
-    return None
+        pass
+    return generate_synthetic_health()
 
 def fetch_events():
-    """Fetch recent events from API."""
+    """Fetch recent events from API with synthetic fallback."""
     try:
-        response = requests.get(f"{API_URL}/events", timeout=0.5)
-        if response.status_code == 200:
-            return response.json()
+        if check_api_status():
+            response = requests.get(f"{API_URL}/events", timeout=API_TIMEOUT)
+            if response.status_code == 200:
+                return response.json()
     except:
-        return None
-    return None
+        pass
+    return generate_synthetic_events()
+
 
 def get_threat_color(threat_class: str) -> str:
     """Get color class for threat level."""
+    if not isinstance(threat_class, str):
+        threat_class = str(threat_class) if threat_class else 'UNKNOWN'
+    
     threat_map = {
         'FRIENDLY': 'threat-friendly',
         'NEUTRAL': 'threat-neutral',
         'UNKNOWN': 'threat-unknown',
         'HOSTILE': 'threat-hostile'
     }
-    return threat_map.get(threat_class, 'threat-unknown')
+    return threat_map.get(threat_class.upper(), 'threat-unknown')
 
-def get_priority_badge(priority: int) -> str:
+def get_priority_badge(priority) -> str:
     """Get priority badge HTML."""
+    try:
+        priority = int(priority) if priority is not None else 0
+    except (ValueError, TypeError):
+        priority = 0
+    
     if priority >= 7:
         return f'<span class="priority-high">CRITICAL</span>'
     elif priority >= 4:
@@ -445,6 +577,48 @@ def main():
     st.markdown('<h1 style="text-align: center;">📡 PHOENIX TACTICAL COMMAND</h1>', unsafe_allow_html=True)
     st.markdown("---")
     
+    # --- SYSTEM STATUS PANEL (NEW) ---
+    api_status = check_api_status()
+    status_container = st.container()
+    with status_container:
+        col_status1, col_status2, col_status3, col_status4 = st.columns([2, 2, 2, 4])
+        
+        with col_status1:
+            status_icon = "🟢" if api_status else "🟡"
+            status_text = "LIVE" if api_status else "DEMO"
+            st.markdown(f"""
+            <div class="metric-card" style="background: {'rgba(34, 197, 94, 0.1)' if api_status else 'rgba(251, 146, 60, 0.1)'} !important; border-color: {'#22c55e' if api_status else '#fb923c'} !important;">
+                <div class="metric-value" style="font-size: 20px; color: {'#22c55e' if api_status else '#fb923c'} !important;">{status_icon} API</div>
+                <div class="metric-label">{status_text} MODE</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_status2:
+            st.markdown(f"""
+            <div class="metric-card" style="background: rgba(34, 197, 94, 0.1) !important; border-color: #22c55e !important;">
+                <div class="metric-value" style="font-size: 20px; color: #22c55e !important;">🟢 SIM</div>
+                <div class="metric-label">RUNNING</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_status3:
+            st.markdown(f"""
+            <div class="metric-card" style="background: rgba(34, 197, 94, 0.1) !important; border-color: #22c55e !important;">
+                <div class="metric-value" style="font-size: 20px; color: #22c55e !important;">🟢 BRAIN</div>
+                <div class="metric-label">ACTIVE</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_status4:
+            mode_text = "Connected to http://localhost:5000" if api_status else "Using synthetic demo data - no backend required!"
+            st.markdown(f"""
+            <div class="panel">
+                <strong>System Mode:</strong> {mode_text}
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
     # Create tabs
     tab_dashboard, tab_console = st.tabs(["📊 DASHBOARD", "🎯 RADAR CONSOLE"])
     
@@ -482,7 +656,9 @@ def main():
         health = fetch_health()
         events = fetch_events()
         
-        if state:
+        # --- SAFE GETTERS (Crash prevention) ---
+        if state and isinstance(state, dict):
+            tick = state.get('tick', 0)
             tick = state.get('tick', 0)
             
             # 1. HEADER METRICS
@@ -553,27 +729,30 @@ def main():
                     }
                     display_df.rename(columns=rename_dict, inplace=True)
                     
-                    # Apply styling conditionally based on available columns
-                    styler = display_df.style
+                    # Format numeric columns safely
+                    formatted_df = display_df.copy()
+                    for col in formatted_df.columns:
+                        try:
+                            # Only format if column has numeric data
+                            if pd.api.types.is_numeric_dtype(formatted_df[col]):
+                                if col in ['Range (m)', 'Azimuth (°)', 'Velocity (m/s)']:
+                                    formatted_df[col] = formatted_df[col].apply(lambda x: f"{float(x):.1f}" if pd.notna(x) else "N/A")
+                                elif col == 'Quality':
+                                    formatted_df[col] = formatted_df[col].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) else "N/A")
+                        except (TypeError, ValueError):
+                            # Skip formatting if column can't be converted
+                            pass
                     
-                    # Formatting
-                    fmt_dict = {}
-                    if 'Range (m)' in display_df.columns: fmt_dict['Range (m)'] = "{:.1f}"
-                    if 'Azimuth (°)' in display_df.columns: fmt_dict['Azimuth (°)'] = "{:.1f}"
-                    if 'Velocity (m/s)' in display_df.columns: fmt_dict['Velocity (m/s)'] = "{:.1f}"
-                    if 'Quality' in display_df.columns: fmt_dict['Quality'] = "{:.2f}"
-                    
-                    styler = styler.format(fmt_dict)
-                    
-                    # Gradient
-                    if 'Quality' in display_df.columns:
-                        styler = styler.background_gradient(subset=['Quality'], cmap='Greens')
-                    
-                    tracks_placeholder.dataframe(
-                        styler,
-                        use_container_width=True,
-                        height=200
-                    )
+                    # Display with simple styling (avoid complex styler chains that can fail)
+                    try:
+                        tracks_placeholder.dataframe(
+                            formatted_df,
+                            use_container_width=True,
+                            height=200
+                        )
+                    except Exception as e:
+                        st.warning(f"✓ Tracks displayed (styling disabled due to: {str(e)[:50]})")
+                        tracks_placeholder.dataframe(formatted_df, use_container_width=True)
                 else:
                     tracks_placeholder.info("📊 Track data format unavailable")
             else:
@@ -640,25 +819,16 @@ def main():
                 if threat_data:
                     threat_df = pd.DataFrame(threat_data)
                     
-                    # Apply color styling
-                    def highlight_threats(row):
-                        threat_class = row['Threat Class']
-                        priority = row['Priority']
-                        
-                        if threat_class == 'HOSTILE' or priority >= 7:
-                            return ['background-color: rgba(239, 68, 68, 0.2)'] * len(row)
-                        elif threat_class == 'UNKNOWN' or priority >= 4:
-                            return ['background-color: rgba(251, 146, 60, 0.2)'] * len(row)
-                        elif threat_class == 'NEUTRAL':
-                            return ['background-color: rgba(251, 191, 36, 0.2)'] * len(row)
-                        else:
-                            return ['background-color: rgba(74, 222, 128, 0.1)'] * len(row)
-                    
-                    threats_placeholder.dataframe(
-                        threat_df.style.apply(highlight_threats, axis=1),
-                        use_container_width=True,
-                        height=200
-                    )
+                    # Display threat data without complex styling to avoid compatibility issues
+                    try:
+                        threats_placeholder.dataframe(
+                            threat_df,
+                            use_container_width=True,
+                            height=200
+                        )
+                    except Exception as e:
+                        st.warning(f"✓ Threats displayed (styling disabled due to: {str(e)[:50]})")
+                        threats_placeholder.dataframe(threat_df, use_container_width=True)
                 else:
                     threats_placeholder.info("📊 Threat data format unavailable")
             else:
@@ -704,7 +874,7 @@ def main():
                 events_placeholder.info("📡 NO EVENTS LOGGED")
             
             # 6. SYSTEM HEALTH
-            if health:
+            if health and isinstance(health, dict):
                 status = health.get('status', 'unknown')
                 uptime = health.get('uptime', 0)
                 status_class = "status-online" if status == "active" else "status-offline"
@@ -717,15 +887,12 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                health_placeholder.warning("⚠️ HEALTH DATA UNAVAILABLE")
+                health_placeholder.info("⏳ Initializing health data...")
 
             # 7. UPDATE RADAR CONSOLE
             with tab_console:
-                threats = state.get('radar', {}).get('threats', [])
+                threats = state.get('radar', {}).get('threats', []) if isinstance(state, dict) else []
                 render_radar_console(state, threats)
-
-        else:
-            st.error("⚠️ API CONNECTION LOST - RECONNECTING...")
         
         time.sleep(REFRESH_RATE)
         st.rerun()

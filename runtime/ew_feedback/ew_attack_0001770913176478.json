@@ -1,0 +1,35 @@
+{
+  "message_id": "a0b8190a-6f51-4243-b629-1960eed0581a",
+  "timestamp": 1770913176.478922,
+  "effector_id": "COGNITIVE_EW_01",
+  "active_countermeasures": [],
+  "engagement_status": [],
+  "overall_effectiveness": 0.10565475543340874,
+  "decision_confidence": 0.8,
+  "expected_impact": 0.25,
+  "effector_health": 1.0,
+  "effector_mode": "DEFENSIVE",
+  "power_available_dbm": 50.0,
+  "decision_latency_ms": 0.0,
+  "threat_count": 0,
+  "schema_version": "1.0.0",
+  "effector_metadata": {
+    "decision_rationale": {
+      "tx_power_scaling": "Low classification confidence (37.5%): boost TX power for weak target SNR",
+      "bandwidth_scaling": "Standard range resolution",
+      "cfar_alpha_scale": "Standard CFAR threshold",
+      "dwell_time_scale": "Standard integration time",
+      "prf_scale": "Standard PRF"
+    },
+    "adaptation_command": {
+      "bandwidth_scaling": 1.0,
+      "tx_power_scaling": 1.5,
+      "cfar_alpha_scale": 1.0,
+      "prf_scale": 1.0,
+      "dwell_time_scale": 1.0,
+      "predicted_snr_improvement_db": 1.7609125905568124,
+      "predicted_pfa_change": -0.0,
+      "predicted_range_resolution_m": 75.0
+    }
+  }
+}

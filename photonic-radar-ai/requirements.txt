@@ -1,23 +1,52 @@
-# Primary Dependencies
-numpy
-scipy
-matplotlib
-streamlit
-# PyTorch - Install with: pip install torch --index-url https://download.pytorch.org/whl/cpu
-# Or for GPU: pip install torch torchvision torchaudio
-opencv-python
-psutil
-seaborn
-scikit-learn
-plotly
+# PHOENIX Radar AI - Production Requirements
+# ===========================================
+# Complete, stable dependencies for the Photonic Radar AI Defense System
+# Python 3.11+ required
+# Install with: pip install -r requirements.txt
 
-# Optional (for RTL-SDR hardware support)
-# pyrtlsdr
-# kafka-python
+# Core Scientific Computing
+# ==========================
+numpy==1.24.3                          # Numerical computing foundation
+scipy==1.11.2                          # Scientific computing (signal processing, special functions)
+pandas==2.0.3                          # Data manipulation and analysis
+scikit-learn==1.3.0                    # Machine learning utilities (metrics, classification)
 
-# Configuration & logging helpers
-pyyaml
-python-json-logger
+# Deep Learning & Neural Networks
+# ===============================
+torch==2.0.1                           # PyTorch deep learning framework
+torchvision==0.15.2                    # Computer vision utilities for torch
+torchaudio==2.0.2                      # Audio processing for torch
 
-# Optional / Legacy
-# tensorflow (Not supported on Python 3.14 yet)
+# Data Visualization
+# ==================
+matplotlib==3.7.2                      # Static 2D plotting library
+seaborn==0.12.2                        # Statistical visualization built on matplotlib
+plotly==5.15.0                         # Interactive visualization library
+
+# Web Frameworks & Servers
+# ========================
+Flask==2.3.2                           # Web framework for API server
+Werkzeug==2.3.6                        # WSGI utilities (required by Flask)
+uvicorn==0.23.1                        # ASGI server (async APIs)
+requests==2.31.0                       # HTTP library for client operations
+
+# Dashboard & UI
+# ==============
+streamlit==1.26.0                      # Web-based dashboard framework
+
+# Data Validation & Utilities
+# ============================
+Pydantic==2.1.1                        # Data validation using Python type annotations
+pydantic-core==2.4.0                   # Core validation engine for Pydantic
+python-dotenv==1.0.0                   # Environment variable management
+colorama==0.4.6                        # Cross-platform colored terminal output
+psutil==5.9.5                          # System and process utilities
+
+# Configuration & Logging
+# ======================
+PyYAML==6.0                            # YAML configuration file support
+python-multipart==0.0.6                # Multipart form data parsing
+
+# Image Processing (optional, included if needed)
+# ================================================
+opencv-python==4.8.0                   # Computer vision library (optional)

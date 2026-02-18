@@ -17,6 +17,7 @@ Author: Nikhil Krishna
 import time
 import numpy as np
 import math
+import warnings
 from typing import List, Dict, Optional
 from simulation_engine.physics import TargetState, KinematicEngine
 from simulation_engine.performance import PerformanceMonitor
@@ -41,9 +42,14 @@ from defense_core import (
     SceneContext as DefenseSceneContext
 )
 
-
-import torch
-import torch.nn.functional as F
+# Try to import torch, provide fallback if unavailable
+try:
+    import torch
+    import torch.nn.functional as F
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    warnings.warn("PyTorch not available - orchestrator will run in fallback mode", UserWarning)
 
 class SimulationOrchestrator:
     def __init__(self, radar_config: Dict, initial_targets: List[TargetState] = [], event_bus=None):
@@ -59,7 +65,8 @@ class SimulationOrchestrator:
         
         # AI Logic
         self.ai_model = initialize_tactical_model(num_target_classes=5)
-        self.ai_model.eval()
+        if self.ai_model is not None:
+            self.ai_model.eval()
         # Mock class labels
         self.class_labels = {0: "Noise", 1: "Drone", 2: "Bird", 3: "Aircraft", 4: "Missile"}
         
@@ -121,8 +128,10 @@ class SimulationOrchestrator:
             self.ew_degradation = None
             print(f"[EW-EFFECTS] EW degradation model DISABLED")
 
-    def _prepare_spectrogram(self, rd_map: np.ndarray) -> torch.Tensor:
+    def _prepare_spectrogram(self, rd_map: np.ndarray):
         """Prepares RD map for CNN input (Reset to 128x128)."""
+        if not TORCH_AVAILABLE:
+            return None
         # 1. Log modulus if not already
         if np.iscomplexobj(rd_map):
             rd_abs = np.abs(rd_map)
@@ -138,8 +147,10 @@ class SimulationOrchestrator:
         # 4. Interpolate to 128x128 (Model Requirement)
         return F.interpolate(tensor, size=(128, 128), mode='bilinear', align_corners=False)
 
-    def _prepare_timeseries(self, velocity: float) -> torch.Tensor:
+    def _prepare_timeseries(self, velocity: float):
         """Synthesizes Doppler time-series input based on track velocity."""
+        if not TORCH_AVAILABLE:
+            return None
         # Seq len 1000
         t = torch.linspace(0, 1, 1000)
         # Doppler shift proxy (just a frequency tone)
@@ -326,7 +337,7 @@ class SimulationOrchestrator:
         
         # --- AI INJECTION START ---
         # Critical Fix: Run Inference on confirmed tracks
-        if tracks:
+        if TORCH_AVAILABLE and tracks and self.ai_model:
             with torch.no_grad():
                 # Prepare batch
                 spec_batch = self._prepare_spectrogram(rd_map) # Shared scene context
@@ -344,6 +355,12 @@ class SimulationOrchestrator:
                     tr['class_id'] = int(class_idx.item())
                     tr['class_label'] = self.class_labels.get(tr['class_id'], "Unknown")
                     tr['confidence'] = float(conf.item())
+        elif tracks and not TORCH_AVAILABLE:
+            # Fallback: Use heuristic classification without AI
+            for tr in tracks:
+                tr['class_id'] = 1  # Default class
+                tr['class_label'] = self.class_labels.get(1, "Unknown")
+                tr['confidence'] = 0.5  # Low confidence without AI
         # --- AI INJECTION END ---
 
         self.perf.end_phase("ai_tracking")

@@ -1,15 +1,47 @@
 # 📡 PHOENIX-RADAR: Cognitive Photonic Radar with AI
 
-![Status](https://img.shields.io/badge/Status-Operational-00f2ff)
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![Framework](https://img.shields.io/badge/Streamlit-App-red)
-![Mode](https://img.shields.io/badge/Adaptive-Cognitive-green)
+![Status](https://img.shields.io/badge/Status-Production--Ready-00f2ff)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![Docker](https://img.shields.io/badge/Docker-Supported-blue)
+![Framework](https://img.shields.io/badge/FastAPI-Streamlit-red)
 
-**PHOENIX-RADAR** is a next-generation simulation and control platform for **Cognitive Photonic Radar** systems. It combines high-fidelity photonic signal modeling with advanced AI classification and a closed-loop "cognitive" feedback engine to adapt to dynamic environments in real-time.
+Production-grade cognitive photonic radar simulation platform with AI classification, adaptive waveform control, and comprehensive evaluation framework.
 
 ---
 
-## 🌟 Key Features
+## ⚡ Quick Start
+
+### **Desktop GUI** (Recommended - Single Click)
+```bash
+python run_desktop.py
+```
+Launches full desktop application with system controls, monitoring, and dashboard access.
+
+**→ [Desktop App Documentation](DESKTOP_APP.md)**
+
+### **Demo Mode** (No Setup)
+```bash
+python demo.py
+```
+
+### **Main System**
+```bash
+python main.py --ui
+```
+
+### **Dashboard Only**  
+```bash
+streamlit run photonic-radar-ai/ui/dashboard.py
+```
+
+### **Docker**
+```bash
+docker-compose up --build
+```
+
+**→ [See Full Documentation](README_PRODUCTION.md)**
+
+---
 
 ### 1. Physics-Based Photonic Simulation
 - **Heterodyne Mixing**: High-frequency RF signal generation using photonic heterodyning.
@@ -44,62 +76,58 @@ The system follows a modular architecture designed for research scalability and 
 
 ---
 
-## 🚀 Quick Start
+## 📖 Detailed Guides
 
-### 1. Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/nikhilkrishnanek2002-cpu/photonic-radar-ai.git
-cd photonic-radar-ai
-
-# Setup virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r photonic-radar-ai/requirements.txt
-```
-
-### 2. Launch the System
-
-```bash
-# Start the unified platform launcher
-python photonic-radar-ai/run_platform.py
-```
-
-This will:
-1. Initialize the **Radar & EW Subsystems**.
-2. Start the **API Server** (Port 5000).
-3. Launch the **Tactical Dashboard** (Streamlit).
+- **Production Setup:** [README_PRODUCTION.md](README_PRODUCTION.md)
+- **Research Framework:** [research/README.md](research/README.md)  
+- **Docker Deployment:** [docker-compose.yml](docker-compose.yml)
 
 ---
 
-## 🧠 Cognitive Mode Overview
+## 🧠 Cognitive Adaptation Engine
 
-PHOENIX-RADAR implements a closed-loop cognitive engine that classifies the electromagnetic environment and adapts sensing parameters:
+PHOENIX-RADAR implements adaptive closed-loop control:
 
-- **Search**: Wide-area scanning with standard parameters.
-- **Tracking**: Resource-efficient focus on stable tracks.
-- **Cluttered**: High-resolution bandwidth expansion to suppress false alarms.
-- **Dense Swarm**: High PRF and separation logic for multiple targets.
+- **Search Mode**: Widearea scanning with standard parameters
+- **Track Mode**: Focused tracking with optimized parameters
+- **Clutter Mode**: High-resolution processing to suppress false alarms
+- **Swarm Mode**: Multi-target handling with dynamic PRF
 
 ---
 
-## 🛠️ Verification
-
-To run the automated test suite:
+## 🛠️ Testing & Verification
 
 ```bash
-pytest photonic-radar-ai/tests/
+# Quick demo
+python demo.py --duration 5
+
+# Full test suite
+pytest photonic-radar-ai/tests/ -v
+
+# Performance benchmarking
+python research/benchmark.py
+
+# SNR sensitivity analysis
+python research/noise_experiment.py
 ```
 
 ---
 
-## 📄 License & Attribution
-- **Classification**: Academic / Research
-- **Applications**: DRDO, Electronic Warfare (EW), Next-Gen Sensing.
-- **License**: MIT
+## 📚 Also Available
+
+- **Metrics Framework:** CSV logging with real-time statistics
+- **Latency Profiler:** Per-stage timing analysis  
+- **Benchmarking Suite:** Throughput, latency, accuracy measurement
+- **Research Tools:** SNR sweeps, noise experiments, reports
 
 ---
-*Developed for advanced research in Cognitive Photonic Radar systems.*
+
+## 📄 License & Properties
+- **Status:** Production-Ready
+- **License:** MIT
+- **Python:** 3.11+
+- **Platforms:** Linux, macOS, Windows
+- **Classification:** Academic / Research
+
+---
+*Cognitive Photonic Radar AI - Next-generation sensing platform.*
