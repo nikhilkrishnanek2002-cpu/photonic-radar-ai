@@ -1,0 +1,58 @@
+# Benchmark Configuration
+# =======================
+# Controls performance benchmarking behavior
+
+experiment_name: radar_benchmark_production
+
+# Number of trials to run
+num_trials: 100
+
+# Target frame rate (Hz)
+target_frame_rate: 10
+
+# Number of radar targets to simulate
+num_targets: 3
+
+# Noise level (0.0 to 1.0)
+noise_level: 0.1
+
+# Output directory for results
+output_dir: results
+
+# Enable latency profiling (per-stage measurement)
+enable_latency_profiling: true
+
+# Enable resource monitoring (CPU, memory)
+enable_resource_monitoring: true
+
+# Benchmark parameters
+benchmark:
+  # Trial duration (seconds)
+  trial_duration_sec: 60
+  
+  # Minimum samples per trial
+  min_samples: 50
+  
+  # Throughput target (fps)
+  throughput_target: 10.0
+  
+  # Latency target (ms)
+  latency_target_ms: 15.0
+  
+  # Accuracy target (0.0 to 1.0)
+  accuracy_target: 0.85
+
+# Pipeline stages to profile
+pipeline_stages:
+  - signal_acquisition
+  - signal_processing
+  - detection
+  - tracking
+
+# Performance thresholds for pass/fail
+thresholds:
+  throughput_min_fps: 8.0
+  latency_max_ms: 20.0
+  accuracy_min: 0.75
+  cpu_max_percent: 80.0
+  memory_max_mb: 512.0

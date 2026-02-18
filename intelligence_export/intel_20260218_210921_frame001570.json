@@ -1,0 +1,14 @@
+{
+  "message_id": "c31dc1d4-f582-49a6-ba2c-a5a5b86187be",
+  "timestamp": 1771429161.358683,
+  "frame_id": 1570,
+  "sensor_id": "PHOENIX_RADAR_01",
+  "tracks": [],
+  "threat_assessments": [],
+  "scene_context": {
+    "scene_type": "SEARCH",
+    "clutter_ratio": 0.0,
+    "mean_snr_db": -96.82047180351867,
+    "num_confirmed_tracks": 0
+  }
+}

@@ -1,0 +1,87 @@
+# PHOENIX Radar AI - Minimal Requirements (Production Docker)
+# ===========================================================
+# Ultra-lightweight dependencies for Docker containers
+# Excludes heavy ML frameworks not critical for core radar functionality
+#
+# Build context: FROM python:3.11-slim
+# Install with: pip install --no-cache-dir -r requirements-minimal.txt
+#
+# This is ideal for:
+#   - Docker containers
+#   - Lightweight deployments
+#   - Production minimal footprint
+#   - Testing CI/CD pipelines
+#
+# Excluded (can be added back as needed):
+#   - torch (2+ GB, only if actively doing inference)
+#   - torchvision, torchaudio (only if vision/audio needed)
+#   - plotly (can use matplotlib instead)
+
+# Core Scientific Computing (Essential)
+# =====================================
+numpy==1.24.3                          # Numerical computing (required)
+scipy==1.11.2                          # Signal processing, special functions (required)
+pandas==2.0.3                          # Data handling (required)
+
+# Machine Learning - SKLearn only (lightweight)
+# ==============================================
+scikit-learn==1.3.0                    # ML metrics, utilities (lightweight)
+
+# Visualization - Matplotlib only
+# ================================
+matplotlib==3.7.2                      # Static plotting (lightweight, no web)
+
+# Web Framework & Server
+# ======================
+Flask==2.3.2                           # API server
+Werkzeug==2.3.6                        # Flask dependency
+uvicorn==0.23.1                        # ASGI server
+requests==2.31.0                       # HTTP client
+
+# Dashboard
+# =========
+streamlit==1.26.0                      # Web dashboard
+
+# Data Validation & Utilities
+# ============================
+Pydantic==2.1.1                        # Input validation
+pydantic-core==2.4.0                   # Pydantic engine
+python-dotenv==1.0.0                   # .env support
+colorama==0.4.6                        # Colored output
+
+# ============================================================================
+# SIZE COMPARISON
+# ============================================================================
+#
+# Full requirements.txt: ~3.5 GB (including torch)
+# Minimal requirements: ~600 MB (excluding torch)
+# Minimal with torch CPU: ~2.5 GB
+#
+# ============================================================================
+# WHEN TO USE MINIMAL
+# ============================================================================
+#
+# ✓ Use minimal if:
+#   - Not running neural network inference
+#   - Building Docker images (smaller = faster)
+#   - Limited disk space
+#   - Running on edge devices
+#
+# ✗ Switch to full requirements.txt if:
+#   - Need to train models with PyTorch
+#   - Running AI inference pipelines
+#   - Need advanced visualization (plotly)
+#   - Need comprehensive ML toolkit
+#
+# ============================================================================
+# USAGE
+# ============================================================================
+#
+# For production Docker:
+#   pip install -r requirements-minimal.txt
+#
+# For development (add torch later):
+#   pip install -r requirements-minimal.txt
+#   pip install torch torchvision  # If needed
+#
+# ============================================================================

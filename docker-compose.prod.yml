@@ -1,0 +1,131 @@
+# docker-compose.prod.yml
+# Production overrides for docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Purpose: Production-grade configuration with resource limits, monitoring, logging
+
+version: '3.8'
+
+services:
+  backend:
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'      # Max 1.5 CPU cores
+          memory: 1G       # Max 1 GB RAM
+        reservations:
+          cpus: '1'
+          memory: 512M
+    
+    # Production environment overrides
+    environment:
+      - LOG_LEVEL=WARNING
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    
+    # Restart policy: always restart unless explicitly stopped
+    restart: unless-stopped
+    
+    # Logging configuration for production
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=backend,environment=production"
+    
+    # Health check for monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Enable container restart on OOM
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+
+  streamlit:
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '1'        # Max 1 CPU core
+          memory: 768M     # Max 768 MB RAM
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # Production environment overrides
+    environment:
+      - LOG_LEVEL=WARNING
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - STREAMLIT_CLIENT_TOOLBAR_MODE=minimal
+      - STREAMLIT_LOGGER_LEVEL=warning
+    
+    # Restart policy: always restart unless explicitly stopped
+    restart: unless-stopped
+    
+    # Logging configuration for production
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=streamlit,environment=production"
+    
+    # Health check via HTTP (Streamlit meta endpoint)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 2
+      start_period: 45s
+    
+    # Graceful shutdown
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+
+# ============================================================================
+# Production Monitoring Notes
+# ============================================================================
+#
+# Resource Limits:
+# - Backend: 1.5 CPU max, 1 GB RAM max
+# - Streamlit: 1 CPU max, 768 MB RAM max
+# - Ensures system stability under load
+# - Prevents resource exhaustion
+#
+# Logging:
+# - JSON format for log aggregation
+# - Rotation: 10 MB per file, 3 files maximum
+# - Labels for filtering in centralized logging
+# - Produces logs in: docker logs <container>
+#
+# Health Checks:
+# - Backend: /health endpoint (30s interval)
+# - Streamlit: /_stcore/health endpoint (60s interval)
+# - Restart policy: unless-stopped (manual control)
+# - Enables automatic restart on failure
+#
+# Deployment Steps:
+# 1. Set .env with production values
+# 2. docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# 3. Monitor: docker stats, docker compose logs
+# 4. Scale: docker compose up -d --scale backend=2 (optional)
+#
+# Log Aggregation Integration:
+# To send logs to Splunk, ELK, or similar:
+# 1. Install logging driver: docker plugin install <driver>
+# 2. Update logging driver in this file
+# 3. Configure credentials in .env
+#
+# Performance Tuning:
+# If services are throttled:
+# - Increase resource limits
+# - Reduce health check frequency
+# - Enable caching in application
+# - Add CDN for static assets
+#

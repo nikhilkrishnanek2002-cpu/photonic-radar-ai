@@ -1,0 +1,138 @@
+# PHOENIX Radar AI - Development Requirements
+# ============================================
+# Additional packages for development, testing, and code quality
+#
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+
+# Testing Framework
+# =================
+pytest==7.4.0                          # Testing framework
+pytest-cov==4.1.0                      # Coverage reporting for pytest
+pytest-xdist==3.3.1                    # Parallel test execution
+pytest-timeout==2.1.0                  # Timeout plugin for pytest
+unittest-mock==1.5.0                   # Mock library (backport)
+
+# Code Quality & Linting
+# ======================
+flake8==6.0.0                          # Style guide enforcement
+black==23.7.0                          # Code formatter (opinionated)
+isort==5.12.0                          # Import statement sorter
+pylint==2.17.4                         # Code analysis
+mypy==1.4.1                            # Static type checker
+autopep8==2.0.2                        # Automatic PEP 8 compliance
+
+# Documentation
+# ==============
+sphinx==7.1.2                          # Documentation generator
+sphinx-rtd-theme==1.3.0                # ReadTheDocs theme for Sphinx
+docstring-parser==0.15                 # Parse docstrings
+
+# Profiling & Debugging
+# =====================
+py-spy==0.3.14                         # Sampling profiler
+memory-profiler==0.61.0                # Memory profiling
+line-profiler==4.0.3                   # Line-by-line profiling
+ipython==8.14.0                        # Enhanced interactive Python shell
+ipdb==0.13.13                          # IPython debugger
+
+# Jupyter Support
+# ===============
+jupyter==1.0.0                         # Jupyter notebook server
+jupyterlab==4.0.3                      # Improved Jupyter interface
+notebook==7.0.2                        # Notebook web application
+ipywidgets==8.0.7                      # Interactive widgets for Jupyter
+
+# Database Tools
+# ==============
+sqlalchemy==2.0.20                     # SQL toolkit and ORM
+alembic==1.11.1                        # Database migration tool
+
+# Configuration Management
+# ========================
+pyyaml==6.0                            # YAML support
+python-dotenv==1.0.0                   # Environment variable management
+hydra-core==1.3.1                      # Configuration management
+
+# Code Generation & Analysis
+# ===========================
+dataclasses-json==0.5.14               # JSON serialization for dataclasses
+pydantic==2.1.1                        # Data validation
+
+# Development Utilities
+# =====================
+pre-commit==3.3.3                      # Git hooks framework
+bump2version==1.0.1                    # Version bumping
+python-dotenv==1.0.0                   # Environment management
+watchdog==3.0.0                        # Filesystem event monitoring
+colorama==0.4.6                        # Terminal colors
+
+# API Development Extras
+# ======================
+fastapi==0.100.0                       # Modern async web framework (alternative to Flask)
+pydantic-settings==2.0.1               # Settings validation for Pydantic
+
+# ============================================================================
+# DEVELOPMENT INSTALLATION
+# ============================================================================
+#
+# Install base requirements + dev tools:
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# Or separately:
+#   pip install -r requirements.txt     # Production dependencies
+#   pip install -r requirements-dev.txt # Development only
+#
+# ============================================================================
+# COMMON DEVELOPMENT WORKFLOWS
+# ============================================================================
+#
+# 1. Run tests with coverage:
+#    pytest --cov=photonic-radar-ai tests/
+#
+# 2. Run tests in parallel:
+#    pytest -n auto tests/
+#
+# 3. Format code:
+#    black photonic-radar-ai/
+#    isort photonic-radar-ai/
+#
+# 4. Lint code:
+#    flake8 photonic-radar-ai/
+#    pylint photonic-radar-ai/
+#
+# 5. Type check:
+#    mypy photonic-radar-ai/
+#
+# 6. Profile code performance:
+#    py-spy record -o profile.svg -- python main.py
+#
+# 7. Memory profiling:
+#    mprof run main.py
+#    mprof plot
+#
+# 8. Generate documentation:
+#    cd docs/
+#    make html
+#
+# ============================================================================
+# PRE-COMMIT HOOKS SETUP
+# ============================================================================
+#
+# Initialize pre-commit hooks:
+#   pre-commit install
+#
+# Run hooks manually:
+#   pre-commit run --all-files
+#
+# Create .pre-commit-config.yaml:
+#   repos:
+#     - repo: https://github.com/psf/black
+#       rev: 23.7.0
+#       hooks:
+#         - id: black
+#     - repo: https://github.com/PyCQA/isort
+#       rev: 5.12.0
+#       hooks:
+#         - id: isort
+#
+# ============================================================================

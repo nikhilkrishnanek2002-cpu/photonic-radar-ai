@@ -1,0 +1,168 @@
+# Master Experiment Configuration
+# ================================
+# Orchestrates comprehensive evaluation of radar detection system
+
+# Experiment metadata
+metadata:
+  project_name: Photonic Radar AI
+  description: Research-grade evaluation framework for radar detection
+  version: 1.0
+  created: 2024-01-01
+  author: Research Team
+
+# Global settings
+global:
+  # Seed for reproducible randomization
+  random_seed: 42
+  
+  # Output directory
+  results_dir: results
+  
+  # Enable verbose logging
+  verbose: true
+  
+  # Save intermediate results
+  save_intermediate: true
+
+# Benchmark configuration
+benchmark:
+  enabled: true
+  config_file: configs/benchmark_config.yaml
+  
+  # Run variations
+  variations:
+    - name: baseline
+      description: Standard performance benchmark
+      num_trials: 100
+      target_frame_rate: 10
+      
+    - name: high_load
+      description: Maximum throughput scenario
+      num_trials: 200
+      target_frame_rate: 30
+      
+    - name: low_latency
+      description: Emphasize latency minimization
+      num_trials: 50
+      target_frame_rate: 5
+
+# Noise experiment configuration
+noise_experiment:
+  enabled: true
+  config_file: configs/noise_experiment_config.yaml
+  
+  # SNR scenarios to test
+  scenarios:
+    - name: urban_environment
+      description: Typical urban/indoor SNR conditions
+      snr_range: [5, 20]
+      
+    - name: challenging_conditions
+      description: Low SNR, high interference
+      snr_range: [0, 10]
+      
+    - name: optimal_conditions
+      description: High SNR, low interference
+      snr_range: [10, 30]
+
+# Latency profiling
+latency_profiling:
+  enabled: true
+  
+  # Stages to profile
+  stages:
+    - signal_acquisition
+    - signal_processing
+    - detection
+    - tracking
+    - output_generation
+  
+  # Percentiles to compute
+  percentiles: [50, 75, 90, 95, 99]
+
+# Report generation
+reporting:
+  enabled: true
+  
+  # Generate markdown reports
+  markdown_reports: true
+  
+  # Generate HTML reports
+  html_reports: false
+  
+  # Generate comparison reports
+  comparison_reports: true
+  
+  # Plot generation
+  generate_plots: true
+  
+  # Export formats
+  export_formats:
+    - json
+    - csv
+    - markdown
+
+# Evaluation criteria (PASS/FAIL thresholds)
+evaluation_criteria:
+  throughput:
+    min_fps: 8.0
+    pass_description: "System maintains minimum throughput"
+  
+  latency:
+    max_ms: 20.0
+    p95_max_ms: 25.0
+    pass_description: "System meets latency requirements"
+  
+  accuracy:
+    min_score: 0.80
+    pass_description: "Detection accuracy acceptable"
+  
+  resources:
+    cpu_max_percent: 80.0
+    memory_max_mb: 512.0
+    pass_description: "Resource usage within limits"
+
+# Experiment schedule (execution order)
+schedule:
+  - id: 1
+    name: baseline_benchmark
+    type: benchmark
+    config: baseline
+    depends_on: []
+    
+  - id: 2
+    name: noise_urban
+    type: noise_experiment
+    scenario: urban_environment
+    depends_on: [1]
+    
+  - id: 3
+    name: noise_challenging
+    type: noise_experiment
+    scenario: challenging_conditions
+    depends_on: [1]
+    
+  - id: 4
+    name: latency_profile
+    type: latency_profiling
+    depends_on: [1, 2, 3]
+    
+  - id: 5
+    name: final_report
+    type: report_generation
+    depends_on: [1, 2, 3, 4]
+
+# Recovery and restart settings
+runtime:
+  # Timeout per experiment (seconds)
+  experiment_timeout_sec: 600
+  
+  # Retry failed experiments
+  retry_on_failure: true
+  max_retries: 3
+  
+  # Save session state
+  checkpoint_frequency: 10  # Every N minutes
+  
+  # Enable profiling
+  profiling_enabled: true

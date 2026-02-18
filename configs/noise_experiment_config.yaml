@@ -1,0 +1,77 @@
+# Noise Sensitivity Experiment Configuration
+# =============================================
+# Controls SNR sweep experiments
+
+experiment_name: noise_sensitivity_analysis
+
+# SNR range to sweep (dB)
+snr_db_range:
+  min: 0.0
+  max: 30.0
+
+# Step size between SNR points (dB)
+snr_db_step: 2.0
+
+# Number of detection frames per SNR level
+frames_per_snr: 50
+
+# Number of radar targets
+num_targets: 3
+
+# Target detection probability at optimal SNR
+target_detection_prob: 0.85
+
+# False alarm rate at optimal SNR
+false_alarm_rate: 0.05
+
+# Output directory for results
+output_dir: results
+
+# SNR points (optional - overrides range and step)
+# Leave commented to use range/step
+# snr_points:
+#   - 0.0
+#   - 5.0
+#   - 10.0
+#   - 15.0
+#   - 20.0
+#   - 25.0
+#   - 30.0
+
+# Detection thresholds
+thresholds:
+  # SNR at which to achieve 80% detection
+  snr_80_percent_detection: null  # Auto-calculated
+  
+  # SNR at which to achieve 90% detection
+  snr_90_percent_detection: null
+  
+  # SNR at which false alarm rate drops below 1%
+  snr_low_false_alarms: null
+  
+  # Recommended operating SNR (at max F1 score)
+  recommended_snr_db: null
+
+# Analysis parameters
+analysis:
+  # Compute percentiles
+  percentiles: [50, 75, 90, 95, 99]
+  
+  # Generate plots
+  enable_plots: true
+  
+  # Statistical significance test
+  statistical_test: true
+  
+  # Confidence level for stats (0.0 to 1.0)
+  confidence_level: 0.95
+
+# Performance metrics to track
+metrics:
+  - detection_rate
+  - false_alarm_rate
+  - precision
+  - recall
+  - f1_score
+  - accuracy
+  - processing_latency_ms

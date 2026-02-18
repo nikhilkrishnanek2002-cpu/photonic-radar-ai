@@ -1,0 +1,58 @@
+{
+  "message_id": "a737607c-5444-4b03-967e-b22dda3fd17b",
+  "timestamp": 1771430798.8341725,
+  "frame_id": 420,
+  "sensor_id": "PHOENIX_RADAR_01",
+  "tracks": [
+    {
+      "track_id": 6,
+      "range_m": 96.02787145122085,
+      "azimuth_deg": 36.0,
+      "radial_velocity_m_s": -2.5841862655679764,
+      "track_quality": 0.5,
+      "track_age_frames": 0,
+      "last_update_timestamp": 1771430798.8341274,
+      "radial_acceleration_m_s2": -0.0007371040868843865
+    },
+    {
+      "track_id": 7,
+      "range_m": 307.598657410698,
+      "azimuth_deg": 36.0,
+      "radial_velocity_m_s": -3.112148307124533,
+      "track_quality": 0.5,
+      "track_age_frames": 0,
+      "last_update_timestamp": 1771430798.8341413,
+      "radial_acceleration_m_s2": -0.0008878753773843434
+    }
+  ],
+  "threat_assessments": [
+    {
+      "track_id": 6,
+      "threat_class": "UNKNOWN",
+      "target_type": "UAV",
+      "classification_confidence": 0.5,
+      "threat_priority": 5,
+      "engagement_recommendation": "MONITOR",
+      "classification_uncertainty": 0.5,
+      "position_uncertainty_m": 5.0,
+      "velocity_uncertainty_m_s": 2.5
+    },
+    {
+      "track_id": 7,
+      "threat_class": "UNKNOWN",
+      "target_type": "UAV",
+      "classification_confidence": 0.5,
+      "threat_priority": 5,
+      "engagement_recommendation": "MONITOR",
+      "classification_uncertainty": 0.5,
+      "position_uncertainty_m": 5.0,
+      "velocity_uncertainty_m_s": 2.5
+    }
+  ],
+  "scene_context": {
+    "scene_type": "SPARSE",
+    "clutter_ratio": 0.0,
+    "mean_snr_db": -96.8044248603156,
+    "num_confirmed_tracks": 2
+  }
+}

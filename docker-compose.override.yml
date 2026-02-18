@@ -1,0 +1,32 @@
+# docker-compose.override.yml
+# Development overrides for docker-compose.yml
+# Automatically loaded by docker-compose when present
+# Usage: docker-compose up --build (uses both .yml and .override.yml)
+
+version: '3.8'
+
+services:
+  backend:
+    # Use source code from local directory (hot reload)
+    volumes:
+      - .:/app
+      - /app/__pycache__  # Don't sync pycache
+    environment:
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+    # Run with debug output
+    command: python main.py --debug
+    # Prevent auto-restart on failure (better for debugging)
+    restart: no
+
+  streamlit:
+    # Use source code from local directory (hot reload)
+    volumes:
+      - .:/app
+      - /app/__pycache__  # Don't sync pycache
+    environment:
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+    # Streamlit with development settings
+    command: streamlit run photonic-radar-ai/ui/dashboard.py --logger.level=debug --client.showErrorDetails=true
+    restart: no

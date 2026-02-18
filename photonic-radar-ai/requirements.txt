@@ -13,9 +13,9 @@ scikit-learn==1.3.0                    # Machine learning utilities (metrics, cl
 
 # Deep Learning & Neural Networks
 # ===============================
-torch==2.0.1                           # PyTorch deep learning framework
-torchvision==0.15.2                    # Computer vision utilities for torch
-torchaudio==2.0.2                      # Audio processing for torch
+torch==2.0.1                           # PyTorch deep learning framework (optional, with fallback)
+torchvision==0.15.2                    # Computer vision utilities for torch (optional)
+torchaudio==2.0.2                      # Audio processing for torch (optional)
 
 # Data Visualization
 # ==================
@@ -25,14 +25,18 @@ plotly==5.15.0                         # Interactive visualization library
 
 # Web Frameworks & Servers
 # ========================
+fastapi==0.103.1                       # Modern async web framework (API backend)
 Flask==2.3.2                           # Web framework for API server
 Werkzeug==2.3.6                        # WSGI utilities (required by Flask)
 uvicorn==0.23.1                        # ASGI server (async APIs)
 requests==2.31.0                       # HTTP library for client operations
+python-multipart==0.0.6                # Multipart form data parsing
 
 # Dashboard & UI
 # ==============
 streamlit==1.26.0                      # Web-based dashboard framework
+PySide6>=6.5.0                         # Qt6 Python bindings for desktop GUI
+psutil==5.9.5                          # System and process utilities
 
 # Data Validation & Utilities
 # ============================
@@ -40,13 +44,24 @@ Pydantic==2.1.1                        # Data validation using Python type annot
 pydantic-core==2.4.0                   # Core validation engine for Pydantic
 python-dotenv==1.0.0                   # Environment variable management
 colorama==0.4.6                        # Cross-platform colored terminal output
-psutil==5.9.5                          # System and process utilities
 
 # Configuration & Logging
 # ======================
 PyYAML==6.0                            # YAML configuration file support
-python-multipart==0.0.6                # Multipart form data parsing
+loguru==0.7.2                          # Enhanced logging library (optional)
 
-# Image Processing (optional, included if needed)
-# ================================================
+# Build & Packaging
+# =================
+PyInstaller>=5.10.0                    # Package Python apps as standalone executables
+
+# Image Processing (optional)
+# ==========================
 opencv-python==4.8.0                   # Computer vision library (optional)
+
+# Development & Testing (optional)
+# ================================
+pytest==7.4.0                          # Testing framework
+pytest-cov==4.1.0                      # Code coverage for tests
+black==23.7.0                          # Code formatter
+pylint==2.17.5                         # Code linter (optional)
+

@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # Backend: Radar simulation engine + EW subsystem + API server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: phoenix-backend
+    ports:
+      - "8000:5000"  # API: external 8000 → internal 5000
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - LOG_LEVEL=INFO
+      - API_HOST=0.0.0.0
+      - API_PORT=5000
+    volumes:
+      # Shared state for IPC
+      - ./runtime:/app/runtime
+      # Logs for persistence
+      - ./logs/backend:/app/logs
+      # Cache for faster rebuilds
+      - phoenix-cache:/app/.cache
+    command: python main.py
+    networks:
+      - phoenix-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.phoenix.service=backend"
+      - "com.phoenix.component=simulation"
+
+  # Streamlit UI: Tactical dashboard
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: phoenix-ui
+    ports:
+      - "8501:8501"  # Streamlit: 8501
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - LOG_LEVEL=INFO
+      - API_URL=http://backend:5000
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_CLIENT_LOGGING_LEVEL=info
+    volumes:
+      # Shared state for IPC
+      - ./runtime:/app/runtime
+      # Logs for persistence
+      - ./logs/streamlit:/app/logs
+      # Cache for faster rebuilds
+      - phoenix-cache:/app/.cache
+    command: streamlit run photonic-radar-ai/ui/dashboard.py
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - phoenix-network
+    restart: unless-stopped
+    labels:
+      - "com.phoenix.service=ui"
+      - "com.phoenix.component=dashboard"
+
+networks:
+  # Shared network for service communication
+  phoenix-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  # Cache volume for pip and builds
+  phoenix-cache:
+    driver: local

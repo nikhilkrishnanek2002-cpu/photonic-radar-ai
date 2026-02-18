@@ -1,0 +1,37 @@
+{
+  "message_id": "828f7b50-6823-4fb1-93d8-2c24597e99df",
+  "timestamp": 1770954967.2860415,
+  "frame_id": 257,
+  "sensor_id": "PHOENIX_RADAR_01",
+  "tracks": [
+    {
+      "track_id": 1,
+      "range_m": 286.12335107311384,
+      "azimuth_deg": 288.0,
+      "radial_velocity_m_s": -2.349595288737662,
+      "track_quality": 0.5,
+      "track_age_frames": 0,
+      "last_update_timestamp": 1770954967.2859774,
+      "radial_acceleration_m_s2": -0.0006700946244421672
+    }
+  ],
+  "threat_assessments": [
+    {
+      "track_id": 1,
+      "threat_class": "NEUTRAL",
+      "target_type": "UNKNOWN",
+      "classification_confidence": 0.2917318642139435,
+      "threat_priority": 2,
+      "engagement_recommendation": "IGNORE",
+      "classification_uncertainty": 0.7082681357860565,
+      "position_uncertainty_m": 5.0,
+      "velocity_uncertainty_m_s": 2.5
+    }
+  ],
+  "scene_context": {
+    "scene_type": "SPARSE",
+    "clutter_ratio": 0.0,
+    "mean_snr_db": -96.79194510358764,
+    "num_confirmed_tracks": 1
+  }
+}

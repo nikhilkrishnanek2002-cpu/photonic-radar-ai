@@ -1,0 +1,14 @@
+{
+  "message_id": "a320ac51-7e90-450d-9103-574968990a1b",
+  "timestamp": 1770955250.4256606,
+  "frame_id": 2297,
+  "sensor_id": "PHOENIX_RADAR_01",
+  "tracks": [],
+  "threat_assessments": [],
+  "scene_context": {
+    "scene_type": "SEARCH",
+    "clutter_ratio": 0.0,
+    "mean_snr_db": -96.70609205767526,
+    "num_confirmed_tracks": 0
+  }
+}
