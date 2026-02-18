@@ -120,8 +120,7 @@ echo ""
 
 # Verify installation
 echo -e "${YELLOW}Verifying installation...${NC}"
-python -c "import numpy, scipy, pandas, streamlit, PySide6, fastapi, torch; print('✓ All core packages installed')" 2>/dev/null || \
-python -c "import numpy, scipy, pandas, streamlit, PySide6, fastapi; print('✓ All core packages installed (torch optional)')"
+python verify_install.py
 echo ""
 
 echo -e "${GREEN}Ready to launch! 🚀${NC}"
