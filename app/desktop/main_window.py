@@ -254,9 +254,26 @@ class MainWindow(QMainWindow):
             QPushButton:pressed { background-color: #b87519; }
         """)
         
+        self.demo_button = QPushButton("🎮 Run Demo")
+        self.demo_button.setMinimumHeight(40)
+        self.demo_button.clicked.connect(self.run_demo)
+        self.demo_button.setStyleSheet("""
+            QPushButton {
+                background-color: #9b59b6;
+                color: white;
+                font-weight: bold;
+                border-radius: 5px;
+                padding: 10px;
+            }
+            QPushButton:hover { background-color: #8e44ad; }
+            QPushButton:pressed { background-color: #7d3c98; }
+            QPushButton:disabled { background-color: #95a5a6; }
+        """)
+        
         button_layout.addWidget(self.start_button)
         button_layout.addWidget(self.stop_button)
         button_layout.addWidget(self.reload_button)
+        button_layout.addWidget(self.demo_button)
         button_group.setLayout(button_layout)
         left_layout.addWidget(button_group)
         
@@ -420,6 +437,57 @@ class MainWindow(QMainWindow):
         import time
         time.sleep(2)
         self.start_system()
+    
+    def run_demo(self):
+        """Run demo simulation"""
+        self.console.log("Starting demo simulation...")
+        self.demo_button.setEnabled(False)
+        
+        try:
+            import subprocess
+            import sys
+            from pathlib import Path
+            
+            # Use project's Python
+            python_exe = sys.executable
+            demo_script = Path(__file__).resolve().parent.parent.parent / "demo.py"
+            
+            if not demo_script.exists():
+                self.console.log("Error: demo.py not found")
+                QMessageBox.critical(self, "Error", f"demo.py not found at {demo_script}")
+                self.demo_button.setEnabled(True)
+                return
+            
+            # Stream demo output to console
+            process = subprocess.Popen(
+                [python_exe, str(demo_script)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            
+            # Read output line by line
+            import threading
+            
+            def read_output():
+                try:
+                    for line in process.stdout:
+                        self.console.log(line.rstrip())
+                except Exception as e:
+                    self.console.log(f"Error reading demo output: {e}")
+                finally:
+                    process.wait()
+                    self.demo_button.setEnabled(True)
+                    self.console.log("Demo simulation completed")
+            
+            thread = threading.Thread(target=read_output, daemon=True)
+            thread.start()
+            
+        except Exception as e:
+            self.console.log(f"Failed to run demo: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to run demo: {e}")
+            self.demo_button.setEnabled(True)
     
     def open_dashboard(self):
         """Open dashboard in browser"""
